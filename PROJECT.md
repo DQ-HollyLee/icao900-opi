@@ -1,5 +1,8 @@
 # ICAO 900 · OPI 口语练习
 
+- 仓库：<https://github.com/DQ-HollyLee/icao900-opi>（公开，MIT）
+- Release v1.0.0：<https://github.com/DQ-HollyLee/icao900-opi/releases/tag/v1.0.0>
+
 在 900 句学习器基础上加 **OPI（PEPEC 口试面试）** 模块的测试版，与发行版 `com.icao.n900`
 包名不同（`com.icao.opi`），可同机共存。
 
