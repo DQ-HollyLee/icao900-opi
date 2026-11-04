@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>body{margin:0;font:12px monospace;background:#fff}iframe{width:412px;height:880px;border:1px solid #ddd}
+#out{padding:10px;white-space:pre-wrap}</style></head>
+<body>
+<script>
+/* 预置一条演练记录：测历史记录与雷达图（重置测试会清掉） */
+try {
+  localStorage.setItem('opi900.chats', JSON.stringify([{
+    id: 'seed1', ts: 1762300000000, topics: ['飞机机型', '飞行环境'],
+    final: '整体相当于 ICAO 4 级。发音清晰，结构基本正确，词汇够用但航空术语偏少，流畅度中等，' +
+      '理解没有偏差，应对略慢。下一步：多练长句连接词、积累机务与气象术语、减少自我修正。',
+    questions: [
+      { q: 'What type of aircraft have you flown?', cn: '你飞过哪些机型？', topic: '飞机机型',
+        rec: 'I have flown the Cessna 172 and the DA42.', audio: '',
+        scores: { pron: 4, struct: 4, vocab: 4, fluency: 3, comp: 5, inter: 4 }, comment: '回答切题，机型名称准确。' },
+      { q: 'What do you know about wind shear?', cn: '你对风切变了解多少？', topic: '飞行环境',
+        rec: 'Wind shear is a sudden change of wind speed or direction.', audio: '',
+        scores: { pron: 4, struct: 3, vocab: 4, fluency: 3, comp: 4, inter: 3 }, comment: '定义正确，可补充处置方法。' }
+    ]
+  }]));
+} catch (e) {}
+</script>
+<iframe id="f" src="index.html"></iframe>
+<pre id="out"></pre>
+<script>
+var out = document.getElementById('out'), f = document.getElementById('f');
+var pass = 0, fail = 0;
+function ok(name, cond, extra) {
+  if (cond) { pass++; out.textContent += 'PASS ' + name + '\n'; }
+  else { fail++; out.textContent += 'FAIL ' + name + (extra !== undefined ? ' :: ' + extra : '') + '\n'; }
+}
+function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function D() { return f.contentDocument; }
+function W() { return f.contentWindow; }
+function LS(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+
+async function run() {
+  await wait(1500);
+  var d = D();
+
+  // 1) 数据
+  var od = await fetch('opi.json').then(function (r) { return r.json(); });
+  ok('OPI 6 大类', od.groups.length === 6, od.groups.length);
+  ok('OPI 话题 = 69', od.topics.length === 69, od.topics.length);
+  ok('OPI 题数 = 352', od.count === 352, od.count);
+  ok('每张卡都有问题/翻译/示例答案/音频', od.topics.every(function (t) {
+    return t.items.every(function (c) { return !!c.q && !!c.cn && !!c.a && !!c.au; });
+  }));
+
+  // 2) 首页 OPI 分区（在已掌握/未掌握下面，且有分割）
+  var split = d.querySelector('.opi-split');
+  var deckRow = d.querySelector('.deck-row');
+  ok('首页有 OPI 分割区', !!split);
+  ok('OPI 区在 900 句重点复习之后', split && deckRow &&
+     (deckRow.compareDocumentPosition(split) & Node.DOCUMENT_POSITION_FOLLOWING));
+  ok('首页有 OPI 话题目录入口', !!d.querySelector('[data-opi="toc"]'));
+  ok('首页有 OPI 收藏夹入口', !!d.querySelector('[data-opi="fav"]'));
+  ok('首页不再放模拟对话入口（已归到组卷）',
+     !d.querySelector('.chat-card') && !d.querySelector('[data-opi="chat"]'));
+  ok('OPI 两张卡与 900 句章节卡同款', (function () {
+    var a = d.querySelector('[data-opi="toc"]');
+    return a && a.classList.contains('ch-card') && !!a.querySelector('.ring .v') &&
+      a.querySelector('.idx').textContent.length <= 10;
+  })());
+
+  // 3) 话题目录
+  d.querySelector('[data-opi="toc"]').click();
+  await wait(400);
+  var tc = d.querySelectorAll('.topic-card');
+  ok('话题目录列出全部话题', tc.length === 69, tc.length);
+  ok('话题目录按大类分组', d.querySelectorAll('.sec-title.opi-sec').length === 6);
+
+  // 4) 进入卡片
+  tc[0].click();
+  await wait(500);
+  ok('进入 OPI 卡片', !!d.querySelector('#flip'));
+  ok('有录音按钮', !!d.querySelector('#btnRec'));
+  ok('有 Pass 按钮', !!d.querySelector('#btnPass'));
+  ok('有收藏按钮', !!d.querySelector('#btnFav'));
+  ok('OPI 没有已掌握/未掌握', !d.querySelector('#btnKnown') && !d.querySelector('#btnUnknown'));
+  ok('OPI 卡片已移除重听问题键', !d.querySelector('#btnReplayQ'));
+  ok('OPI 卡片有回放键', !!d.querySelector('#btnPlayRec'));
+  /* 真点一次播放，验证取到的是 opi/ 下的问题 TTS，而不是 900 句的 audio/ */
+  var W2 = W(), origAudio = W2.Audio, seen = [];
+  W2.Audio = function (u) { seen.push(u); return new origAudio(u); };
+  W2.Audio.prototype = origAudio.prototype;
+  try { d.querySelector('#btnPlay').click(); } catch (e) {}
+  W2.Audio = origAudio;
+  ok('点播放确实加载 opi/ 问题 TTS', /^opi\//.test(seen[0] || ''), seen[0]);
+
+  // 翻面看背面内容
+  var W_ = W();
+  var flip = d.querySelector('#flip');
+  flip.style.transform = '';
+  // 直接点背面内容检查 DOM（背面一直在 DOM 里）
+  ok('背面有问题文本', !!d.querySelector('#enText .en-in') && d.querySelector('#enText .en-in').textContent.length > 5);
+  ok('背面有示例答案', !!d.querySelector('.opi-ans'));
+  ok('背面有中文翻译', !!d.querySelector('.op .cn') || !!d.querySelector('.cn'));
+
+  // 5) Pass 计数
+  d.querySelector('#btnPass').click();
+  await wait(250);
+  var po = LS('opi900.pass');
+  var firstKey = po && Object.keys(po)[0];
+  ok('Pass 计数写入', po && po[firstKey] === 1, JSON.stringify(po));
+
+  // 6) 收藏
+  d.querySelector('#btnFav').click();
+  await wait(250);
+  var fv = LS('opi900.fav');
+  ok('收藏写入', fv && Object.keys(fv).length === 1, JSON.stringify(fv));
+  ok('收藏按钮变「已收藏」', /已收藏/.test(d.querySelector('#btnFav').textContent));
+
+  // 7) 收藏夹（从首页进）
+  W_ = W();
+  localStorage.setItem('opi900.fav', JSON.stringify(fv));
+  // 回首页
+  d.querySelector('#btnOpiBack').click();
+  await wait(300);
+  d.querySelector('#btnOpiBack').click();
+  await wait(500);
+  d.querySelector('[data-opi="fav"]').click();
+  await wait(400);
+  var favTopics = d.querySelectorAll('.topic-card.fav');
+  ok('收藏夹按话题分类', favTopics.length === 1, favTopics.length);
+  ok('收藏夹显示收藏数', /1 问已收藏/.test(d.querySelector('.topic-card.fav').textContent));
+
+  // 收藏夹里点进卡片：只含收藏卡片
+  d.querySelector('.topic-card.fav').click();
+  await wait(400);
+  var pager = d.querySelector('.p-bar .mid .s');
+  ok('收藏夹卡片只含已收藏', pager && /1 \/ 1/.test(pager.textContent), pager && pager.textContent);
+  d.querySelector('#btnOpiBack').click();
+  await wait(300);
+
+  // 8) 模拟对话入口在「组卷」板块里
+  d.querySelector('#btnOpiBack').click();       // 回首页
+  await wait(400);
+  d.querySelector('[data-tab="exam"]').click();
+  await wait(400);
+  ok('组卷页有模拟对话入口', !!d.querySelector('#btnGoChat'));
+  ok('组卷页入口与组卷卡片同款', (function () {
+    var b = d.querySelector('#btnGoChat');
+    return b && b.classList.contains('lv-card');
+  })());
+  d.querySelector('#btnGoChat').click();
+  await wait(400);
+  ok('模拟对话有说明', /六方面|六个方面/.test(d.body.innerText) || /六个/.test(d.body.innerText));
+  ok('说明写明要点两次麦克风', /再点一次/.test(d.body.innerText));
+  ok('未配置时开始按钮禁用或提示', (function () {
+    var b = d.querySelector('#btnStartChat');
+    return (b && b.disabled) || /还没有配置对话模型/.test(d.body.innerText);
+  })());
+  ok('历史演练列表有种子记录', !!d.querySelector('[data-chatrec]'));
+  ok('历史记录显示具体 ICAO 等级（非“合格”）',
+     /ICAO 3/.test(d.querySelector('.chat-rec .r').textContent),
+     d.querySelector('.chat-rec .r').textContent);
+
+  // 9) 演练报告：总评 + 雷达图
+  d.querySelector('[data-chatrec]').click();
+  await wait(500);
+  ok('报告有雷达图 SVG', !!d.querySelector('svg.radar'));
+  ok('雷达图 6 个维度标签', (function () {
+    var svg = d.querySelector('svg.radar');
+    if (!svg) return false;
+    var txt = svg.textContent;
+    return ['发音', '结构', '词汇', '流畅', '理解', '应对'].every(function (k) { return txt.indexOf(k) >= 0; });
+  })());
+  ok('报告有考官总评', /考官总评/.test(d.body.innerText));
+  ok('报告有答题记录', /答题记录/.test(d.body.innerText));
+  ok('报告列出每题回答', /Cessna 172/.test(d.body.innerText));
+  ok('报告头部显示具体 ICAO 等级（如 ICAO 3 · 可操作级）',
+     /ICAO 3/.test(d.querySelector('.chat-result-head .lvl').textContent),
+     d.querySelector('.chat-result-head .lvl').textContent);
+
+  // 10) 设置页有对话模型配置
+  d.querySelector('#btnChatBack').click();
+  await wait(300);
+  d.querySelector('#btnOpiBack').click();
+  await wait(300);
+  d.querySelector('[data-tab="settings"]').click();
+  await wait(400);
+  ok('设置页有对话模型配置', !!d.querySelector('#chatBase') && !!d.querySelector('#chatModel') && !!d.querySelector('#chatKey'));
+  ok('设置 AI 转写栏已重命名并澄清（非“AI 识别评分”）',
+     !/AI 识别评分/.test(d.body.innerText) && /AI 语音转写/.test(d.body.innerText),
+     'AI识别评分=' + (/AI 识别评分/.test(d.body.innerText) ? '仍存在' : '已无') +
+     ' 语音转写=' + (/AI 语音转写/.test(d.body.innerText) ? '有' : '无'));
+
+  out.textContent += '\n== PASS ' + pass + ' / FAIL ' + fail + ' ==\n';
+}
+run().catch(function (e) {
+  out.textContent += 'ERROR ' + (e && e.message) + '\n' + (e && e.stack || '');
+});
+</script>
+</body></html>

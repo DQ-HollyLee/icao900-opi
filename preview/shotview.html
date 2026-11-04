@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#fff}iframe{border:0;display:block;width:412px;height:100vh}</style>
+</head><body>
+<script>
+/* 预置：一条收藏 + 一条演练记录，截图时能看到完整界面 */
+try {
+  localStorage.setItem('opi900.fav', JSON.stringify({ '611-01': 1, '611-03': 1, '621-01': 1 }));
+  localStorage.setItem('opi900.pass', JSON.stringify({ '611-01': 2, '611-02': 1 }));
+  localStorage.setItem('icao900.settings', JSON.stringify({
+    asr: true, online: true, autoPlay: false, showCn: true, rate: 1,
+    ai: true, aiBase: 'https://mock.local/v1', aiModel: 'whisper-1', aiKey: 'sk-mock',
+    localAsr: false, chatBase: 'https://mock.local/v1', chatModel: 'gpt-4o-mini', chatKey: 'sk-mock'
+  }));
+  localStorage.setItem('opi900.chats', JSON.stringify([{
+    id: 'seed1', ts: 1762300000000, topics: ['飞机机型', '飞行环境'],
+    final: '整体水平接近 ICAO 4 级。发音清晰、理解准确是优势；结构上时态偶有跳跃，' +
+      '航空术语储备偏少，流畅度受自我修正影响。建议按话题积累术语、用完整句作答。',
+    questions: [
+      { q: 'What type of aircraft have you flown?', cn: '你飞过哪些机型？', topic: '飞机机型',
+        rec: 'I have flown the Cessna 172 and the DA42.', audio: '',
+        scores: { pron: 4, struct: 4, vocab: 4, fluency: 3, comp: 5, inter: 4 }, comment: '回答切题，机型准确。' },
+      { q: 'What do you know about wind shear?', cn: '你对风切变了解多少？', topic: '飞行环境',
+        rec: 'Wind shear is a sudden change of wind speed or direction.', audio: '',
+        scores: { pron: 4, struct: 3, vocab: 4, fluency: 3, comp: 4, inter: 3 }, comment: '定义正确。' }
+    ]
+  }]));
+} catch (e) {}
+</script>
+<iframe id="f" src="index.html"></iframe>
+<script>
+var v = (location.search.match(/v=([a-z]+)/) || [])[1] || 'home';
+var f = document.getElementById('f');
+f.onload = function () {
+  var d = f.contentDocument, w = f.contentWindow;
+  setTimeout(function () {
+    function click(sel) { var e = d.querySelector(sel); if (e) e.click(); return !!e; }
+    if (v === 'home') return;
+    if (v === 'settings') { click('[data-tab="settings"]'); return; }
+    if (v === 'toc') { click('[data-opi="toc"]'); return; }
+    if (v === 'deck') {
+      click('[data-opi="toc"]');
+      setTimeout(function () {
+        var t = d.querySelectorAll('.topic-card')[0];
+        if (t) t.click();
+      }, 300);
+      return;
+    }
+    if (v === 'fav') { click('[data-opi="fav"]'); return; }
+    if (v === 'chat') {
+      click('[data-tab="exam"]');
+      setTimeout(function () { click('#btnGoChat'); }, 400);
+      return;
+    }
+    if (v === 'report') {
+      click('[data-tab="exam"]');
+      setTimeout(function () {
+        click('#btnGoChat');
+        setTimeout(function () {
+          var r = d.querySelector('[data-chatrec]');
+          if (r) r.click();
+        }, 450);
+      }, 400);
+      return;
+    }
+  }, 700);
+};
+</script>
+</body></html>
+<script>
+/* v=deck900：对照用，进入 900 句第一章卡片 */
+if (v === 'deck900') {
+  f.onload = function () {
+    setTimeout(function () {
+      var c = f.contentDocument.querySelector('.ch-card');
+      if (c) c.click();
+    }, 900);
+  };
+}
+</script>
+<script>
+/* v=deckback / v=deck900back：模拟一次左右拖拽，翻到卡片背面 */
+if (v === 'deckback' || v === 'deck900back') {
+  f.onload = function () {
+    setTimeout(function () {
+      var d = f.contentDocument, W = f.contentWindow;
+      var c = d.querySelector('.ch-card');
+      if (v === 'deck900back') { if (c) c.click(); }
+      else { d.querySelector('[data-opi="toc"]').click(); setTimeout(function () { var t = d.querySelector('.topic-card'); if (t) t.click(); }, 350); }
+      setTimeout(function () {
+        var el = d.querySelector('#flip');
+        if (!el) return;
+        el.dispatchEvent(new W.PointerEvent('pointerdown', { bubbles: true, clientX: 340, clientY: 300 }));
+        el.dispatchEvent(new W.PointerEvent('pointermove', { bubbles: true, clientX: 120, clientY: 300 }));
+        el.dispatchEvent(new W.PointerEvent('pointerup', { bubbles: true, clientX: 120, clientY: 300 }));
+      }, 800);
+    }, 900);
+  };
+}
+</script>
+
+<script>
+/* v=chatrun：进入模拟对话并答一题，截图看对话流 */
+if (v === 'chatrun') {
+  f.onload = function () {
+    var d = f.contentDocument;
+    setTimeout(function () {
+      d.querySelector('[data-tab="exam"]').click();
+      setTimeout(function () {
+        d.querySelector('#btnGoChat').click();
+        setTimeout(function () {
+          var b = d.querySelector('#btnStartChat');
+          if (b) b.click();
+          setTimeout(function () {
+            var rb = d.querySelector('#btnRec');
+            if (rb) rb.click();                 // 第一次：开始录音
+            setTimeout(function () {
+              var rb2 = d.querySelector('#btnRec');
+              if (rb2) rb2.click();             // 第二次：结束并评分
+            }, 1500);
+          }, 900);
+        }, 450);
+      }, 400);
+    }, 900);
+  };
+}
+</script>
+<script>
+/* v=exam：组卷板块全貌（含模拟对话入口） */
+if (v === 'exam') {
+  f.onload = function () {
+    setTimeout(function () {
+      var b = f.contentDocument.querySelector('[data-tab="exam"]');
+      if (b) b.click();
+    }, 900);
+  };
+}
+</script>

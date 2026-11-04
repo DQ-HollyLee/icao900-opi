@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;overflow:hidden;background:#fff}iframe{width:412px;height:880px;border:0;display:block}
+#log{position:fixed;left:0;top:0;font:10px monospace;color:#f00;background:#fff;z-index:9;max-width:412px;opacity:0}
+body.debug #log{opacity:1}</style>
+</head><body>
+<iframe id="f"></iframe>
+<pre id="log"></pre>
+<script>
+var q = new URLSearchParams(location.search);
+if (q.get('debug')) document.body.className = 'debug';
+var steps = JSON.parse(q.get('steps') || '[]');
+var f = document.getElementById('f');
+function log(s) { document.getElementById('log').textContent += s + '\n'; }
+function run(i) {
+  if (i >= steps.length) { log('DONE'); return; }
+  var s = steps[i], d = f.contentDocument;
+  if (s[0] === 'wait') { setTimeout(function () { run(i + 1); }, s[1]); return; }
+  if (s[0] === 'eval') {
+    try { var r = f.contentWindow.eval(s[1]); log('eval=' + r); }
+    catch (e) { log('ERR ' + e.message); }
+    setTimeout(function () { run(i + 1); }, s[2] || 300);
+    return;
+  }
+  var el = d.querySelector(s[0]);
+  log((el ? 'click ' : 'missing ') + s[0]);
+  if (el) el.click();
+  setTimeout(function () { run(i + 1); }, s[2] || 500);
+}
+var seedName = q.get('seed');
+if (seedName) {
+  fetch('seed/' + seedName + '.json').then(function (r) { return r.json(); }).then(function (d) {
+    localStorage.setItem('icao900.exams', JSON.stringify(d));
+    localStorage.setItem('icao900.progress', JSON.stringify({ '1': { st: 'known', hl: [0] }, '3': { st: 'unknown', hl: [] } }));
+    // 截图用的假诊断数据（模拟"被系统压掉 26 dB"的一台机器）
+    localStorage.setItem('icao900.lastrec', JSON.stringify({
+      at: Date.now(), ms: 2400, src: 'MIC', rate: 16000,
+      inPeakDb: -31.2, gainDb: 18.6, outPeakDb: -1.0, rmsDb: -16.0
+    }));
+    f.src = 'index.html';
+  });
+} else {
+  f.src = 'index.html';
+}
+f.onload = function () {
+  try {
+    f.contentWindow.onerror = function (m, src, line, col, err) {
+      log('JSERR: ' + m + ' @' + line + ':' + col);
+    };
+  } catch (e) { log('hook fail ' + e.message); }
+  setTimeout(function () { run(0); }, 800);
+};
+</script>
+</body></html>

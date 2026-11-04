@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;overflow:hidden;background:#fff}iframe{width:412px;height:880px;border:0;display:block}</style>
+</head><body>
+<script>
+/* 截图专用：写入演示演练记录，按 opitest 的 wait 模式导航到报告页 */
+try {
+  localStorage.setItem('opi900.chats', JSON.stringify([{
+    id: 'demo1', ts: 1762300000000, topics: ['飞机机型', '飞行环境'],
+    final: '整体相当于 ICAO 4 级。发音清晰，结构基本正确，词汇够用但航空术语偏少，流畅度中等，' +
+      '理解没有偏差，应对略慢。下一步：多练长句连接词、积累机务与气象术语、减少自我修正。',
+    questions: [
+      { q: 'What type of aircraft have you flown?', cn: '你飞过哪些机型？', topic: '飞机机型',
+        rec: 'I have flown the Cessna 172 and the DA42.', audio: '',
+        scores: { pron: 4, struct: 4, vocab: 4, fluency: 3, comp: 5, inter: 4 }, comment: '回答切题，机型名称准确。' },
+      { q: 'What do you know about wind shear?', cn: '你对风切变了解多少？', topic: '飞行环境',
+        rec: 'Wind shear is a sudden change of wind speed or direction.', audio: '',
+        scores: { pron: 4, struct: 3, vocab: 4, fluency: 3, comp: 4, inter: 3 }, comment: '定义正确，可补充处置方法。' }
+    ]
+  }]));
+} catch (e) {}
+</script>
+<iframe id="f" src="index.html"></iframe>
+<script>
+var f = document.getElementById('f');
+function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function D() { return f.contentDocument; }
+async function run() {
+  await wait(1600);
+  var d = D();
+  d.querySelector('[data-tab="exam"]').click();
+  await wait(900);
+  D().querySelector('#btnGoChat').click();
+  await wait(900);
+  D().querySelector('[data-chatrec]').click();
+  await wait(600);
+  document.title = 'READY';
+}
+run();
+</script>
+</body></html>

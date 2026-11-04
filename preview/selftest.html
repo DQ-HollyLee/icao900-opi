@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>body{margin:0;font:12px monospace;background:#fff}iframe{width:412px;height:880px;border:1px solid #ddd}
+#out{padding:10px;white-space:pre-wrap}</style></head>
+<body>
+<script>
+/* 预置一条考试记录：用来测答卷页的人工评卷（重置测试会把它清掉） */
+try {
+  localStorage.setItem('icao900.exams', JSON.stringify([{
+    id: 'seed1', ts: 1762000000000, total: 12, pass: true,
+    groups: [
+      { lv: 3, name: '三级题组 A', nums: [1, 2, 3, 4], score: 4, replayLeft: 0, played: [1,1,1,1],
+        answers: [
+          { n: 1, score: 1, acc: 1, rec: 'maintaining flight level 310', audio: '' },
+          { n: 2, score: 1, acc: 1, rec: '', audio: '' },
+          { n: 3, score: 1, acc: 1, rec: '', audio: '' },
+          { n: 4, score: 1, acc: 1, rec: '', audio: '' }] },
+      { lv: 3, name: '三级题组 B', nums: [5, 6, 7, 8], score: 4, replayLeft: 1, played: [1,1,1,1],
+        answers: [
+          { n: 5, score: 1, acc: 1, rec: '', audio: '' },
+          { n: 6, score: 1, acc: 1, rec: '', audio: '' },
+          { n: 7, score: 1, acc: 1, rec: '', audio: '' },
+          { n: 8, score: 1, acc: 1, rec: '', audio: '' }] },
+      { lv: 4, name: '四级题组', nums: [442, 443, 444, 445], score: 4, replayLeft: 1, played: [1,1,1,1],
+        answers: [
+          { n: 442, score: 1, acc: 1, rec: '', audio: '' },
+          { n: 443, score: 1, acc: 1, rec: '', audio: '' },
+          { n: 444, score: 1, acc: 1, rec: '', audio: '' },
+          { n: 445, score: 1, acc: 1, rec: '', audio: '' }] }
+    ]}]));
+} catch (e) {}
+</script>
+<iframe id="f" src="index.html"></iframe>
+<pre id="out"></pre>
+<script>
+var out = document.getElementById('out'), f = document.getElementById('f');
+var pass = 0, fail = 0;
+function ok(name, cond, extra) {
+  if (cond) { pass++; out.textContent += 'PASS ' + name + '\n'; }
+  else { fail++; out.textContent += 'FAIL ' + name + (extra ? ' :: ' + extra : '') + '\n'; }
+}
+function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function D() { return f.contentDocument; }
+function W() { return f.contentWindow; }
+
+async function run() {
+  await wait(1200);
+  var d = D();
+  var S = W().Aviation;
+
+  // 1) 数据
+  var data = await fetch('data.json').then(function (r) { return r.json(); });
+  ok('data 900 items', data.items.length === 900, data.items.length);
+  ok('data 8 chapters', data.chapters.length === 8);
+  ok('每句都有音频字段', data.items.every(function (x) { return /^\d{4}\.mp3$/.test(x.a); }));
+  ok('真人录音 > 600', data.items.filter(function (x) { return !x.tts; }).length > 600,
+     data.items.filter(function (x) { return !x.tts; }).length);
+  ok('L3 数量合理', data.items.filter(function (x) { return x.lv === 3; }).length > 100);
+  var l5s = data.items.filter(function (x) { return x.lv >= 5; });
+  ok('L5 = 183 句', l5s.length === 183, l5s.length);
+  ok('L5 全部没有真人录音', l5s.every(function (x) { return x.tts === 1; }));
+  ok('L4 全部有真人录音', data.items.filter(function (x) { return x.lv === 4; })
+     .every(function (x) { return !x.tts; }));
+
+  // 2) 评分规则
+  var l3 = data.items.filter(function (x) { return x.lv === 3; })[0];
+  var l4 = data.items.filter(function (x) { return x.lv === 4; })[0];
+  ok('L3 全对 = 1 分', S.evaluate(l3, l3.s).score === 1, S.evaluate(l3, l3.s).acc);
+  var wrong = l3.s.split(' ');
+  wrong[wrong.length - 1] = 'zzz';
+  ok('L3 有一个词错 = 0 分', S.evaluate(l3, wrong.join(' ')).score === 0);
+
+  var toks = l4.s.split(' ');
+  var partial = toks.slice(0, Math.ceil(toks.length * 0.95));
+  var r95 = S.evaluate(l4, partial.join(' '));
+  ok('L4 ~95% = 1 分', r95.score === 1, r95.acc.toFixed(2));
+  var p75 = toks.slice(0, Math.ceil(toks.length * 0.75));
+  var r75 = S.evaluate(l4, p75.join(' '));
+  ok('L4 ~75% = 0.5 分', r75.score === 0.5, r75.acc.toFixed(2));
+  var p40 = toks.slice(0, Math.ceil(toks.length * 0.4));
+  var r40 = S.evaluate(l4, p40.join(' '));
+  ok('L4 ~40% = 0 分', r40.score === 0, r40.acc.toFixed(2));
+  ok('grade(3, 全对) = 1', S.grade(3, {acc:1, miss:0, near:0}) === 1);
+  ok('grade(3, 缺实词) = 0', S.grade(3, {acc:0.8, miss:1, near:0}) === 0);
+  ok('grade(3, 95% 仍 0 分', S.grade(3, {acc:0.95}) === 0);
+  ok('grade(4, 0.9) = 1', S.grade(4, {acc:0.9, miss:0, near:0}) === 1);
+  ok('grade(4, 0.6) = 0.5', S.grade(4, {acc:0.6, miss:0, near:0}) === 0.5);
+  ok('grade(4, 0.5) = 0', S.grade(4, {acc:0.5, miss:0, near:0}) === 0);
+
+  // 2b) 识别噪声容忍：漏冠词/助动词、连字符、缩写、数字写法
+  function near(n, said) {
+    var it = data.items.filter(function (x) { return x.n === n; })[0];
+    return S.evaluate(it, said);
+  }
+  ok('L3 漏 the/has 即 0 分', near(441, 'air conditioning system malfunctioned').score === 0);
+  ok('de-icing 连字符', near(213, 'request de-icing').score === 1);
+  ok('QNH-1012 连字符', near(5, 'continue descent to 3000 feet, QNH-1012').score === 1);
+  ok('数字逐位读', near(1, 'maintaining flight level three one zero').score === 1);
+  ok('多候选取最好', S.evaluateBest(data.items[0],
+     ['maintaining flight 310', 'maintaining flight level 310']).score === 1);
+
+  // 3) 读音规则：FL/QNH/跑道/频率 归一
+  ok('FL310 归一', S.tokenize('Maintaining FL310.').join(' ') === 'maintaining flight level 310',
+     S.tokenize('Maintaining FL310.').join(' '));
+  ok('tree/niner 同化', S.tokenize('flight level tree one niner').join(' ') === 'flight level 319',
+     S.tokenize('flight level tree one niner').join(' '));
+  ok('跑道 L/R 归一', S.tokenize('Runway 36R').join(' ') === 'runway 36 right',
+     S.tokenize('Runway 36R').join(' '));
+
+  // 4) 卡片交互：高亮 + 掌握
+  d.querySelector('.ch-card').click();
+  await wait(600);
+  ok('进入卡片', !!d.querySelector('.flip'));
+  ok('练习页没有评分按钮', !d.querySelector('#btnScore') && !d.querySelector('#scoreBox'));
+  ok('练习页录音区不再重复放原声按钮', !d.querySelector('#btnPlayMine'));
+  ok('卡片本体仍有原声播放键', !!d.querySelector('#btnPlay') && !!d.querySelector('#btnPlayBack'));
+  var w = d.querySelector('#enText .w');
+  var before = w.className;
+  d.querySelector('#enText').click();
+  // 直接点 span 更可靠
+  var ME = W().MouseEvent;
+  var ev = new ME('click', { bubbles: true });
+  w.dispatchEvent(ev);
+  await wait(200);
+  var prog = JSON.parse(localStorage.getItem('icao900.progress') || '{}');
+  ok('单词高亮已持久化', !!prog['1'] && prog['1'].hl && prog['1'].hl.length === 1,
+     JSON.stringify(prog));
+
+  // 4b) 翻面后单词必须真的能点中（WebView 里 backface-visibility 不挡命中测试）
+  (function () {
+    var flip = d.querySelector('#flip');
+    var r = flip.getBoundingClientRect();
+    var cy = r.top + r.height / 2;
+    var PE = W().PointerEvent;
+    function pe(t, x) {
+      flip.dispatchEvent(new PE(t, {
+        bubbles: true, cancelable: true, clientX: x, clientY: cy, pointerId: 1, pointerType: 'touch'
+      }));
+    }
+    pe('pointerdown', r.left + r.width * 0.85);
+    pe('pointermove', r.left + r.width * 0.55);
+    pe('pointermove', r.left + r.width * 0.15);
+    pe('pointerup', r.left + r.width * 0.15);
+    // 无头环境下 CSS transition 不随 virtual-time 推进，手动落到静止态再测命中
+    var fl = d.querySelector('#flip');
+    fl.style.transition = 'none';
+    fl.style.transform = 'rotateY(' + (fl.classList.contains('flipped') ? 180 : 0) + 'deg)';
+  })();
+  await wait(300);
+  var sp2 = d.querySelectorAll('#enText .w')[0];
+  var rr2 = sp2.getBoundingClientRect();
+  var hit = d.elementFromPoint(rr2.left + rr2.width / 2, rr2.top + rr2.height / 2);
+  var fr2 = d.querySelector('#flip').getBoundingClientRect();
+  var chit = d.elementFromPoint(fr2.left + fr2.width / 2, fr2.top + fr2.height / 2);
+  ok('翻面后单词可命中', !!(hit && hit.classList && hit.classList.contains('w')),
+     (hit ? hit.tagName + '.' + hit.className : 'null') +
+     ' | word@' + Math.round(rr2.left) + ',' + Math.round(rr2.top) + ' ' +
+     Math.round(rr2.width) + 'x' + Math.round(rr2.height) +
+     ' | card@' + Math.round(fr2.left) + ',' + Math.round(fr2.top) + ' ' +
+     Math.round(fr2.width) + 'x' + Math.round(fr2.height) +
+     ' | center=' + (chit ? chit.tagName + '.' + chit.className : 'null') +
+     ' | pe(front)=' + W().getComputedStyle(d.querySelector('.face.front')).pointerEvents +
+     ' pe(back)=' + W().getComputedStyle(d.querySelector('.face.back')).pointerEvents +
+     ' tf=' + W().getComputedStyle(d.querySelector('#flip')).transform);
+  ok('背面有独立播放键', !!d.querySelector('#btnPlayBack'));
+
+  d.querySelector('#btnKnown').click();
+  await wait(200);
+  prog = JSON.parse(localStorage.getItem('icao900.progress') || '{}');
+  ok('已掌握已记录', prog['1'] && prog['1'].st === 'known', JSON.stringify(prog['1'] || {}));
+
+  // 4d) 目录跳转 + 断点记忆
+  d.querySelector('#btnToc').click();
+  await wait(250);
+  ok('目录面板打开', !d.querySelector('#tocWrap').classList.contains('hidden'));
+  var tocItems = d.querySelectorAll('#tocList .toc-item');
+  ok('目录列出整章', tocItems.length === data.chapters[0].count, tocItems.length);
+  tocItems[4].click();
+  await wait(400);
+  ok('目录可跳转', d.querySelector('.p-bar .mid .s').textContent.indexOf('5 /') === 0,
+     d.querySelector('.p-bar .mid .s').textContent);
+  ok('跳转后目录自动关闭', d.querySelector('#tocWrap').classList.contains('hidden'));
+
+  // 5) 退出卡片 → 首页统计
+  d.querySelector('#btnBack').click();
+  await wait(500);
+  ok('已掌握计数显示', d.querySelector('.hero .big').textContent.indexOf('1') === 0,
+     d.querySelector('.hero .big').textContent);
+
+  // 5b) 再进同一章节：从上次那句继续
+  d.querySelector('.ch-card').click();
+  await wait(500);
+  ok('记住上次学习位置', d.querySelector('.p-bar .mid .s').textContent.indexOf('5 /') === 0,
+     d.querySelector('.p-bar .mid .s').textContent);
+  d.querySelector('#btnBack').click();
+  await wait(400);
+
+  // 5c) 按等级分类：3/4 级两个入口，L4 里不含 L5
+  d.querySelector('[data-htab="lv"]').click();
+  await wait(300);
+  ok('等级分类有 3 级和 4 级两张卡', d.querySelectorAll('.lv-card').length === 2);
+  var l4count = data.items.filter(function (x) { return x.lv === 4; }).length;
+  d.querySelectorAll('.lv-card')[1].click();
+  await wait(500);
+  var s4 = d.querySelector('.p-bar .mid .s').textContent;
+  ok('L4 分类只含 4 级句', s4.indexOf('/ ' + l4count + ' ') >= 0, s4);
+  d.querySelector('#btnBack').click();
+  await wait(400);
+  d.querySelector('[data-htab="ch"]') && d.querySelector('[data-htab="ch"]').click();
+  await wait(200);
+
+  // 6) 组卷
+  d.querySelector('[data-tab="exam"]').click();
+  await wait(500);
+  d.querySelector('#btnStartExam').click();
+  await wait(600);
+  var heads = d.querySelectorAll('.exam-progress .g');
+  ok('三组题', heads.length === 3);
+  // 第一组全是短句（<=7 词），第二组覆盖全部三级句且不与第一组重复
+  function wc(n) { return (data.items.filter(function (x) { return x.n === n; })[0].en.match(/[A-Za-z0-9'-]+/g) || []).length; }
+  var g1nums = heads[0].getAttribute('data-nums').split(',').map(Number);
+  var g2nums = heads[1].getAttribute('data-nums').split(',').map(Number);
+  ok('第一组都是短句(<=7词)', g1nums.every(function (n) { return wc(n) <= 7; }),
+     g1nums.map(wc).join(','));
+  ok('第二组不与第一组重复', g2nums.every(function (n) { return g1nums.indexOf(n) < 0; }),
+     g1nums.join('|') + ' vs ' + g2nums.join('|'));
+  function itemOf(n) { return data.items.filter(function (x) { return x.n === n; })[0]; }
+  ok('第二组都是三级句', g2nums.every(function (n) { return itemOf(n).lv === 3; }));
+  var g3nums = heads[2].getAttribute('data-nums').split(',').map(Number);
+  var examNums = g1nums.concat(g2nums, g3nums);
+  ok('考试只抽真人录音', examNums.every(function (n) { return !itemOf(n).tts; }));
+  ok('考试不含专家级 5 级', examNums.every(function (n) { return itemOf(n).lv <= 4; }));
+  ok('题组进度显示', d.querySelector('.q-head .l').textContent.indexOf('第 1 题') >= 0);
+  ok('重听机会 1 次', d.querySelector('.q-head .r').textContent.indexOf('1/1') >= 0);
+  await wait(500);   // 等首次自动播放标记
+  ok('每题只播一遍：播放键已禁用', d.querySelector('#btnQPlay').disabled === true);
+  ok('首播后可用重听', d.querySelector('#btnListen').disabled === false);
+  d.querySelector('#btnQPlay').click();
+  await wait(150);
+  ok('重复点击不会重播', d.querySelector('#btnQPlay').disabled === true);
+  d.querySelector('#btnListen').click();
+  await wait(250);
+  ok('重听后机会用完', d.querySelector('.q-head .r').textContent.indexOf('0/1') >= 0);
+  ok('重听后按钮禁用', d.querySelector('#btnListen').disabled === true);
+
+  // 6b) 人工评卷：记录页打开答卷，改判第一题
+  d.querySelector('#btnExamExit') && d.querySelector('#btnExamExit').click();
+  await wait(300);
+  var cancel0 = d.querySelector('#sheetBody .ok');
+  if (cancel0) cancel0.click();
+  await wait(400);
+  d.querySelector('[data-tab="record"]').click();
+  await wait(500);
+  var row0 = d.querySelector('.row-item');
+  ok('记录页有考试记录', !!row0);
+  if (row0) row0.click();
+  await wait(500);
+  var chips = d.querySelectorAll('.grade-card .jchip');
+  ok('答卷有人工判定按钮', chips.length >= 2, chips.length);
+  ok('L3 只有 对/错 两档',
+     d.querySelectorAll('.grade-card')[0].querySelector('.judge').querySelectorAll('.jchip').length === 2);
+  var firstAns = JSON.parse(localStorage.getItem('icao900.exams'))[0].groups[0].answers[0];
+  ok('答卷显示完整原句',
+     d.querySelector('.ans-card .aen').textContent === itemOf(firstAns.n).en,
+     d.querySelector('.ans-card .aen').textContent);
+  ok('答卷有原声按钮', !!d.querySelector('.ans-card [data-orig]'));
+  // 第一题原 1 分 -> 点"错"
+  chips[1].click();
+  await wait(400);
+  var saved = JSON.parse(localStorage.getItem('icao900.exams'))[0];
+  ok('人工改判写入记录', saved.groups[0].answers[0].score === 0 &&
+     saved.groups[0].answers[0].manual === true,
+     JSON.stringify(saved.groups[0].answers[0]));
+  ok('组分数与总分重算', saved.groups[0].score === 3 && saved.total === 11,
+     saved.groups[0].score + '/' + saved.total);
+  ok('改判后仍达标', saved.pass === true);
+
+  // 改判只应刷新那一张卡，不能把整页重绘（重绘会把长答卷滚回顶部）
+  var card0 = d.querySelector('.ans-card[data-gi="0"][data-qi="0"]');
+  ok('改判后卡片分数即时刷新', !!card0 && /^0\s*分$/.test(card0.querySelector('.asc').textContent.trim()),
+     card0 ? card0.querySelector('.asc').textContent : 'no card');
+  ok('改判后卡片出现已改判标记', !!card0 && !!card0.querySelector('.manual-tag'));
+  ok('改判后组小分即时刷新',
+     d.querySelector('[data-gsc="0"]').textContent.indexOf('3/4') === 0,
+     d.querySelector('[data-gsc="0"]').textContent);
+  d.documentElement.scrollTop = 600;
+  var scrollBefore = d.documentElement.scrollTop;
+  var chipAgain = d.querySelector('.ans-card[data-gi="0"][data-qi="0"] [data-judge="0.5"]') ||
+                  d.querySelector('.ans-card[data-gi="0"][data-qi="0"] [data-judge="1"]');
+  if (chipAgain) chipAgain.click();
+  await wait(300);
+  ok('改判后不跳回页首', d.documentElement.scrollTop === scrollBefore,
+     scrollBefore + ' -> ' + d.documentElement.scrollTop);
+  // 还原：再点回原来的"错"，让后续用例看到的分值回到已知状态
+  var back0 = d.querySelector('.ans-card[data-gi="0"][data-qi="0"] [data-judge="0"]');
+  if (back0) back0.click();
+  await wait(300);
+
+  // 再点同一档 → 撤销改判，分数必须回到自动分（只清标记会停在人工值上）
+  var sameChip = d.querySelector('.grade-card .jchip[data-gi="0"][data-qi="0"][data-judge="0"]');
+  sameChip.click();
+  await wait(400);
+  var rev = JSON.parse(localStorage.getItem('icao900.exams'))[0];
+  ok('撤销改判恢复自动分', rev.groups[0].answers[0].score === 1 &&
+     !rev.groups[0].answers[0].manual,
+     JSON.stringify(rev.groups[0].answers[0]));
+  ok('撤销后总分还原', rev.total === 12, rev.total);
+
+  // 6b) 录音中途离开：状态必须复位，不能把按钮留在"录音中"
+  d.querySelector('[data-tab="home"]').click();
+  await wait(500);
+  var card = d.querySelector('.ch-card');
+  if (card) card.click();
+  await wait(900);
+  d.querySelector('#btnRec').click();
+  await wait(350);
+  var wasRec = d.querySelector('#btnRec').classList.contains('recording');
+  d.querySelector('#btnBack').click();
+  await wait(500);
+  ok('录音中返回会收掉录音态', wasRec && !!d.querySelector('.ch-card'),
+     'wasRec=' + wasRec);
+
+  // 7) 重置
+  d.querySelector('#btnExamExit') && d.querySelector('#btnExamExit').click();
+  await wait(300);
+  var cancel = d.querySelector('#sheetBody .ok');
+  if (cancel) cancel.click();
+  await wait(300);
+  d.querySelector('[data-tab="settings"]').click();
+  await wait(400);
+  ok('设置页有 AI 地址/模型/Key 输入',
+     !!d.querySelector('#aiBase') && !!d.querySelector('#aiModel') && !!d.querySelector('#aiKey'));
+  ok('设置页有录音诊断（排查声音小）', /录音诊断/.test(d.body.innerText));
+  d.querySelector('#btnReset').click();
+  await wait(200);
+  d.querySelector('#sheetBody .ok').click();
+  await wait(400);
+  ok('重置清空进度', localStorage.getItem('icao900.progress') === null);
+  ok('重置清空考试', localStorage.getItem('icao900.exams') === null);
+
+  out.textContent += '\n== PASS ' + pass + ' / FAIL ' + fail + ' ==\n';
+  document.title = 'DONE';
+}
+run().catch(function (e) { out.textContent += 'ERROR ' + e.message + '\n' + e.stack; document.title = 'ERR'; });
+</script>
+</body></html>

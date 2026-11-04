@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>body{margin:0;font:12px monospace}
+iframe{width:412px;height:900px;border:1px solid #ccc}#out{padding:8px;white-space:pre-wrap}</style></head>
+<body>
+<iframe id="f" src="index.html"></iframe>
+<pre id="out"></pre>
+<script>
+var v = (location.search.match(/v=([a-z0-9]+)/) || [])[1] || 'decks';
+var out = document.getElementById('out'), f = document.getElementById('f');
+function rect(d, sel) {
+  var e = d.querySelector(sel);
+  if (!e) return sel + ': MISSING';
+  var r = e.getBoundingClientRect();
+  var cs = d.defaultView.getComputedStyle(e);
+  return sel + ': ' + Math.round(r.width) + 'x' + Math.round(r.height) +
+    ' @' + Math.round(r.top) + ' display=' + cs.display + ' vis=' + cs.visibility +
+    ' opacity=' + cs.opacity + ' transform=' + cs.transform;
+}
+f.onload = function () {
+  var d = f.contentDocument;
+  setTimeout(function () {
+    if (v === 'decks') d.querySelector('[data-opi="toc"]').click();
+    if (v === 'decks' || v === 'deck') {
+      var t = d.querySelector('.topic-card');
+      if (t) t.click();
+    }
+    if (v === 'deck900') { var c = d.querySelector('.ch-card'); if (c) c.click(); }
+    setTimeout(function () {
+      var html = [];
+      html.push('VIEW ' + v);
+      html.push('player html length: ' + (d.querySelector('.player') ? d.querySelector('.player').innerHTML.length : 'none'));
+      ['.player', '.p-bar', '.deck-wrap', '#flip', '.face.front', '.face.back',
+       '.pager', '.rec-zone', '.mastery', '#btnPlay', '#btnRec', '#btnPass'].forEach(function (s) {
+        html.push(rect(d, s));
+      });
+      out.textContent = html.join('\n');
+    }, 700);
+  }, 900);
+};
+</script>
+</body></html>

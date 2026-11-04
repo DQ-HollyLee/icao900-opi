@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0b1f3a">
+<title>ICAO 900句 · OPI</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="app"></div>
+
+<!-- 底部导航 -->
+<nav id="tabbar" class="tabbar">
+  <button data-tab="home" class="tab active">
+    <svg viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10v16H5.5A1.5 1.5 0 0 1 4 18.5zM12 4h6.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H12z"/></svg>
+    <span>学习</span>
+  </button>
+  <button data-tab="exam" class="tab">
+    <svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm8 1.5V8h3.5zM8 12h8v1.6H8zm0 3.4h5.5V17H8z"/></svg>
+    <span>组卷</span>
+  </button>
+  <button data-tab="record" class="tab">
+    <svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zm7 9a7 7 0 0 1-6 6.93V21h-2v-2.07A7 7 0 0 1 5 12h2a5 5 0 0 0 10 0z"/></svg>
+    <span>记录</span>
+  </button>
+  <button data-tab="settings" class="tab">
+    <svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.9 4a7.9 7.9 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a8 8 0 0 0-2-1.2L16.1 3H7.9l-.4 2.5a8 8 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5a7.9 7.9 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-1a8 8 0 0 0 2 1.2l.4 2.5h8.2l.4-2.5a8 8 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5c.06-.4.1-.8.1-1.2z"/></svg>
+    <span>设置</span>
+  </button>
+</nav>
+
+<div id="sheet" class="sheet-mask hidden"><div class="sheet" id="sheetBody"></div></div>
+<div id="toast" class="toast"></div>
+
+<script>
+/* 只在本地预览（http）时加载假桥，APK 里跑的是 https://app.local，不会命中 */
+if (location.protocol === 'http:') document.write('<script src="mock-bridge.js"><\/script>');
+</script>
+<script src="js/aviation.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

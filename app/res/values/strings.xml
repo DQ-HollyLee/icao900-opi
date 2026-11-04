@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ICAO900 OPI</string>
+    <color name="navy">#0B1F3A</color>
+    <color name="bg">#F4F8FD</color>
+    <color name="icon_bg">#0B1F3A</color>
+</resources>

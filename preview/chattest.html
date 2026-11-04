@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>body{margin:0;font:12px monospace;background:#fff}iframe{width:412px;height:880px;border:1px solid #ddd}
+#out{padding:10px;white-space:pre-wrap}</style></head>
+<body>
+<script>
+/* 预置设置：AI 转写 + 对话模型都配好，走完整评分链路 */
+try {
+  localStorage.setItem('icao900.settings', JSON.stringify({
+    asr: true, online: true, autoPlay: false, showCn: true, rate: 1,
+    ai: true, aiBase: 'https://mock.local/v1', aiModel: 'whisper-1', aiKey: 'sk-mock',
+    localAsr: false, chatBase: 'https://mock.local/v1', chatModel: 'gpt-4o-mini', chatKey: 'sk-mock'
+  }));
+} catch (e) {}
+</script>
+<iframe id="f" src="index.html"></iframe>
+<pre id="out"></pre>
+<script>
+var out = document.getElementById('out'), f = document.getElementById('f');
+var pass = 0, fail = 0;
+function ok(name, cond, extra) {
+  if (cond) { pass++; out.textContent += 'PASS ' + name + '\n'; }
+  else { fail++; out.textContent += 'FAIL ' + name + (extra !== undefined ? ' :: ' + extra : '') + '\n'; }
+}
+function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function D() { return f.contentDocument; }
+
+async function run() {
+  await wait(1600);
+  var d = D();
+
+  // 进入模拟对话：入口在「组卷」板块
+  d.querySelector('[data-tab="exam"]').click();
+  await wait(400);
+  ok('组卷页有模拟对话入口', !!d.querySelector('#btnGoChat'));
+  d.querySelector('#btnGoChat').click();
+  await wait(400);
+  var b = d.querySelector('#btnStartChat');
+  ok('配置齐全后开始按钮可用', b && !b.disabled);
+
+  b.click();
+  await wait(600);
+  ok('进入对话进行页', !!d.querySelector('.chat-flow'));
+  ok('展示考官问题气泡', !!d.querySelector('.bub.examiner'));
+  ok('有录音按钮', !!d.querySelector('#btnRec'));
+
+  var q1 = d.querySelector('.bub.examiner').textContent;
+  ok('问题是英文疑问句', /\?/.test(q1), q1.slice(0, 40));
+
+  // 答题：第一次点开始录音；不点第二次绝不能自动评分
+  d.querySelector('#btnRec').click();
+  await wait(300);
+  ok('录音按钮进入录音态', d.querySelector('#btnRec').classList.contains('recording'));
+  ok('模拟对话关闭了自动停止', f.contentWindow.__autoStop === false,
+     f.contentWindow.__autoStop);
+  await wait(1800);                     // 远超原来的 1.2s 静音阈值
+  ok('没点第二次前不会自动转写评分', !d.querySelector('.bub.score'));
+  ok('没点第二次前仍在录音', d.querySelector('#btnRec').classList.contains('recording'));
+  ok('提示写明要再点一次', /再点一次/.test(d.body.innerText));
+
+  // 第二次点：结束录音 → 转写 → 评分
+  d.querySelector('#btnRec').click();
+  await wait(2500);
+  var chips = d.querySelector('.bub.score');
+  ok('评分气泡出现', !!chips);
+  ok('六维分数齐全', (function () {
+    if (!chips) return false;
+    var t = chips.textContent;
+    return ['发音', '结构', '词汇', '流畅', '理解', '应对'].every(function (k) { return t.indexOf(k) >= 0; });
+  })(), chips && chips.textContent.slice(0, 60));
+  ok('有简评', /回答切题/.test(d.body.innerText));
+  ok('我的回答回显', /Cessna 172/.test(d.body.innerText));
+  ok('语法不深究：结构分被抬到 4', /结构 [45]/.test(chips ? chips.textContent : ''),
+     chips && chips.textContent.slice(0, 60));
+  ok('发音照常评分、不被强制抬升（mock 返回 3）', /发音 3/.test(chips ? chips.textContent : ''),
+     chips && chips.textContent.slice(0, 60));
+  ok('进度前进到第 2 题', /2 \/ \d+/.test(d.querySelector('.p-bar .mid .s').textContent),
+     d.querySelector('.p-bar .mid .s').textContent);
+
+  // 连续答完剩下的题：每题点两次麦克风
+  var guard = 0;
+  while (!d.querySelector('.chat-final') && guard < 24) {
+    guard++;
+    var rb = d.querySelector('#btnRec');
+    if (rb && !rb.disabled) {
+      rb.click();                       // 开始
+      await wait(180);
+      var rb2 = d.querySelector('#btnRec');
+      if (rb2) rb2.click();             // 说完，结束并评分
+    }
+    await wait(1400);
+    if (d.querySelector('#btnChatAgain')) break;
+  }
+  await wait(1200);
+  ok('全部答完后进入报告', !!d.querySelector('.chat-final') || !!d.querySelector('svg.radar'),
+     guard + ' rounds');
+  ok('报告有雷达图', !!d.querySelector('svg.radar'));
+  ok('报告有总评文字', /ICAO 4 级|总评/.test(d.body.innerText));
+  ok('答题记录条数 ≤15', d.querySelectorAll('.ans-card').length > 0 &&
+     d.querySelectorAll('.ans-card').length <= 15, d.querySelectorAll('.ans-card').length);
+
+  // 记录落库
+  var chats = JSON.parse(localStorage.getItem('opi900.chats') || '[]');
+  ok('演练记录已保存', chats.length === 1, chats.length);
+  ok('录音保留名单已下发', !!f.contentWindow.__prunedChat, f.contentWindow.__prunedChat);
+  ok('总分有均值', chats.length && chats[0].questions.length === d.querySelectorAll('.ans-card').length);
+
+  out.textContent += '\n== PASS ' + pass + ' / FAIL ' + fail + ' ==\n';
+}
+run().catch(function (e) {
+  out.textContent += 'ERROR ' + (e && e.message) + '\n' + (e && e.stack || '');
+});
+</script>
+</body></html>

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>html,body{margin:0}iframe{width:412px;height:900px;border:0}</style></head>
+<body>
+<iframe id="f" src="index.html"></iframe>
+<pre id="out">pending</pre>
+<script>
+setTimeout(function(){
+  var f = document.getElementById('f');
+  var d = f.contentDocument, w = f.contentWindow;
+  var lines = [];
+  lines.push('inner=' + w.innerWidth + ' bodyScroll=' + d.body.scrollWidth + ' docScroll=' + d.documentElement.scrollWidth);
+  ['#app','.grid','.ch-card','.hero','.tabbar','.deck-row'].forEach(function(sel){
+    var el = d.querySelector(sel);
+    if (el) { var r = el.getBoundingClientRect(); lines.push(sel + ' x=' + Math.round(r.x) + ' w=' + Math.round(r.width)); }
+  });
+  var wide = [];
+  d.querySelectorAll('*').forEach(function(el){
+    var r = el.getBoundingClientRect();
+    if (r.right > 420) wide.push(el.tagName + '.' + el.className + ' right=' + Math.round(r.right));
+  });
+  lines.push('over: ' + wide.slice(0,8).join(' | '));
+  document.getElementById('out').textContent = lines.join('\n');
+  document.title = 'DBG';
+}, 2500);
+</script>
+</body></html>

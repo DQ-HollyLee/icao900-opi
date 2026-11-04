@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>html,body{margin:0;background:#fff}iframe{width:412px;height:880px;border:0}#o{position:fixed;left:0;top:0;font:11px monospace;background:#fff;z-index:9}</style></head>
+<body>
+<iframe id="f" src="index.html"></iframe><pre id="o"></pre>
+<script>
+var f=document.getElementById('f'),o=document.getElementById('o');
+function L(s){o.textContent+=s+'\n'}
+f.onload=function(){
+  f.contentWindow.onerror=function(m,s,l){L('JSERR '+m+' @'+l)};
+  setTimeout(function(){
+    var d=f.contentDocument;
+    d.querySelector('[data-tab="exam"]').click();
+    setTimeout(function(){
+      L('tabs=' + [].map.call(d.querySelectorAll('.tabbar .tab'),function(b){return b.getAttribute('data-tab')+':'+(b.className.indexOf('active')>=0?'A':'-')}).join(','));
+      L('view=' + (d.querySelector('#btnStartExam')?'exam':'other'));
+      document.title='DONE';
+    },900);
+  },1000);
+};
+</script></body></html>
