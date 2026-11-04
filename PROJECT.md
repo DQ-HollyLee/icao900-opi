@@ -1,4 +1,4 @@
-# ICAO 900 句 · OPI 测试版
+# ICAO 900 · OPI 口语练习
 
 在 900 句学习器基础上加 **OPI（PEPEC 口试面试）** 模块的测试版，与发行版 `com.icao.n900`
 包名不同（`com.icao.opi`），可同机共存。
@@ -17,7 +17,7 @@
 ```
 icao900-opi-beta/
 ├─ app/
-│  ├─ AndroidManifest.xml          com.icao.opi · 0.2.4-beta (7)
+│  ├─ AndroidManifest.xml          com.icao.opi · 1.0.0 (8)
 │  ├─ java/com/icao/opi/
 │  │  ├─ MainActivity.java         WebView 外壳 + 虚拟域名资源分发 + 权限
 │  │  ├─ TurnController.java       录音(AudioRecord→WAV，RMS 归一) + exam/opic 录音清理
@@ -46,7 +46,7 @@ icao900-opi-beta/
 │  ├─ mock-bridge.js               预览用假原生桥（http 才加载）
 │  └─ shotview.html                按视图截图
 ├─ libs/lib/arm64-v8a/             13 个 native 库（llama.cpp / ggml / mtmd）
-├─ dist/ICAO900-OPI-beta.apk       207MB，debug 签名
+├─ dist/ICAO900-OPI.apk            217MB，debug 签名
 └─ build.sh                        aapt2 → javac → d8 → 打包 dex+so → zipalign → apksigner
 ```
 
@@ -164,7 +164,7 @@ ICAO 等级判断、六维优缺点、两三条最值得练的建议；注明语
 
 ## 4. 与发行版的差异
 
-| 功能 | 发行版 2.0.0 | 本测试版 0.2.4-beta |
+| 功能 | 发行版 2.0.0 | 本应用 1.0.0 |
 |---|---|---|
 | 900 句练习 / 考试 / 记录 | ✅ | ✅ |
 | 语音识别 | 仅本地 Qwen3-ASR | 本地 ASR + 系统识别 + AI 转写（保留测试开关） |
@@ -175,7 +175,7 @@ ICAO 等级判断、六维优缺点、两三条最值得练的建议；注明语
 ## 5. 构建与自测
 
 ```bash
-bash build.sh                       # → dist/ICAO900-OPI-beta.apk（约 207MB）
+bash build.sh                       # → dist/ICAO900-OPI.apk（约 217MB）
 python tools/preview.py             # http://127.0.0.1:8765
 # 三套前端自测（headless Chrome 打开对应页面读取结果）
 #   selftest.html  75 项（900 句回归）
@@ -197,7 +197,7 @@ python tools/preview.py             # http://127.0.0.1:8765
 ## 7. WebView 壳生命周期（息屏/切屏白屏修复）
 
 用户真机反馈：切屏、息屏后回来**有几率整页白屏**，返回上一页再重进（JS 重新渲染）才恢复。
-根因与修法（0.2.4-beta）：
+根因与修法（0.2.4-beta 起修复，1.0.0 起转正）：
 
 - **不再调用 `web.onPause()`**：它会让 WebView 停止绘制，部分机型息屏时渲染面（surface）
   在"已暂停"状态下被销毁，回来后 `web.onResume()` 补不回最后一帧 → 白屏。
@@ -208,3 +208,13 @@ python tools/preview.py             # http://127.0.0.1:8765
   （80ms），用合成层变化强制出帧。opacity 不产生 containing block，比 transform 安全。
 - 已知边界：若系统内存压力下把渲染进程整个杀了，`onRenderProcessGone` 未处理（需重建
   WebView，暂未做）；表现为白屏且点页面内按钮无反应，只能重开 App。
+
+## 8. 开源（1.0.0 转正）
+
+- 去掉全部"中飞 ICAO 帮手"音频署名（该音频并非其出品，与其无关），设置页底部只留"数据保存在本机"。
+- beta → 正式版：`1.0.0 (8)`，应用名 `ICAO900 OPI`，页面标题 `ICAO 900句 · OPI`，APK 名 `ICAO900-OPI.apk`。
+- 协议 **MIT**（可自由修改/商用，但须保留版权声明），版权人 `DQ-HollyLee`，见 `LICENSE`。
+- `README.md` 含功能、截图（`docs/screenshots/`）、构建方法、素材来源与免责声明。
+- `.gitignore` 排除 `.cache/`（SDK 工具链、调试 keystore、解析中间产物）、`.build/`、`dist/`（APK 走 Release）。
+- `build.sh` 的 SDK 路径可用环境变量 `ICAO_SDK_CACHE` 覆盖，便于他人构建。
+- 仓库体积约 365MB（音频 173MB + native 库 192MB），最大单文件 86MB（libllama-common.so），未超 GitHub 100MB 硬限。
