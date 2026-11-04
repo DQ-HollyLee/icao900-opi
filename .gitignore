@@ -1,6 +1,8 @@
 # 构建产物
 .build/
 dist/
+ios/build/
+ios/dist/
 
 # 本地缓存：SDK 工具链、调试签名库、PDF 解析中间产物、预览暂存、截图
 .cache/

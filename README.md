@@ -1,6 +1,8 @@
 # ICAO 900 · OPI 口语练习
 
-面向民航飞行员 / 空管的**离线优先**英语学习 Android 应用：900 句跟读练习 + PEPEC OPI 口语面试演练 + AI 考官模拟对话。
+面向民航飞行员 / 空管的**离线优先**英语学习应用：900 句跟读练习 + PEPEC OPI 口语面试演练 + AI 考官模拟对话。
+
+> **平台**：Android（`app/` + `build.sh`，侧载 APK）· iOS / iPadOS（`ios/`，自签名 ipa，见 [iOS 版](#ios--ipados-版)）
 
 <p>
   <img src="docs/screenshots/01_home.png" width="200" alt="首页">
@@ -29,9 +31,37 @@
 
 ## 下载安装
 
-到 [Releases](../../releases) 下载最新 `ICAO900-OPI.apk`：
+**Android**：到 [Releases](../../releases) 下载最新 `ICAO900-OPI.apk`：
 - Android 7.0+（minSdk 24），仅 **arm64-v8a**
 - 侧载安装，无需 root；本应用不联网也能完成 900 句练习，仅模拟对话 / 云端转写 / 模型下载需要网络
+
+**iOS / iPadOS**：见下节。
+
+## iOS / iPadOS 版
+
+同一套网页前端，iOS 侧用 **WKWebView + 原生 Swift 桥**重写（录音 = AVAudioEngine，识别 = SFSpeechRecognizer，
+网络 = URLSession），不经过 App Store，**自签名安装**。
+
+```bash
+# 需要 macOS + Xcode 命令行工具；本机没有 Mac 时由 GitHub Actions 的 macOS runner 构建
+bash ios/build_ios.sh          # → ios/dist/ICAO900-OPI-ios-<版本>.ipa
+```
+
+也可在仓库 **Actions → iOS beta build → Run workflow** 手动触发云端构建，从 Artifacts 下载 ipa。
+
+安装（任选其一，都是用自己的 Apple ID 重签）：
+
+| 工具 | 平台 | 说明 |
+|---|---|---|
+| **Sideloadly** | Windows / macOS | 拖入 ipa + 自己的 Apple ID，免费账号 7 天一签 |
+| **AltStore / SideStore** | Windows / macOS | 配 AltServer，可自动续签 |
+| **TrollStore** | 设备 | 支持的系统版本可直接安装 |
+| 证书签名工具 | 设备 | 有企业 / 个人证书时使用 |
+
+- 免费 Apple ID：7 天有效期、最多 3 个自签应用；首次启动需允许「麦克风」「语音识别」
+- **不含** Android 版的本地 llama 模型（Qwen3-ASR）：iOS 上自动降级为「系统识别 / AI 云端转写」，
+  建议在设置里配好 AI 转写接口以获得更准的评分
+- 其余功能（900 句、OPI 卡片、考官双嗓音 TTS、模拟对话六维评分 + ICAO 等级）与 Android 版一致
 
 ## 从源码构建
 
@@ -60,6 +90,8 @@ app/
                      LocalAsr（离线识别）、AiClient（云端转写）、ChatClient（对话模型）
   res/               图标与主题
 libs/                llama.cpp / ggml / mtmd 的 arm64-v8a 预编译库
+ios/                 iOS/iPadOS 壳：main.swift（WKWebView + 原生桥）、Info.plist、图标、build_ios.sh
+.github/workflows/   CI：ios.yml 在 macOS runner 上构建 ipa
 tools/               PDF 题库解析、中文翻译补全、OPI 组装与 TTS 生成、本地预览与自测
 preview/            前端自测页（selftest / opitest / chattest）与截图页，不进 APK
 build.sh            构建脚本

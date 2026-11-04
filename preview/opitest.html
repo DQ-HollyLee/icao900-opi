@@ -170,8 +170,9 @@ async function run() {
   ok('报告有考官总评', /考官总评/.test(d.body.innerText));
   ok('报告有答题记录', /答题记录/.test(d.body.innerText));
   ok('报告列出每题回答', /Cessna 172/.test(d.body.innerText));
-  ok('报告头部显示具体 ICAO 等级（如 ICAO 3 · 可操作级）',
-     /ICAO 3/.test(d.querySelector('.chat-result-head .lvl').textContent),
+  ok('报告头部显示具体 ICAO 等级（如 ICAO 3 · 次工作级）',
+     /ICAO 3/.test(d.querySelector('.chat-result-head .lvl').textContent) &&
+     /次工作级/.test(d.querySelector('.chat-result-head .lvl').textContent),
      d.querySelector('.chat-result-head .lvl').textContent);
 
   // 10) 设置页有对话模型配置
