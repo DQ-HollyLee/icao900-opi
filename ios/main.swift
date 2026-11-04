@@ -325,7 +325,7 @@ final class TurnEngine {
     private var voicedMs: Double = 0
     private var firstLoudAt: TimeInterval = 0
     private var lastLoudAt: TimeInterval = 0
-    private var autoStop = true
+    var autoStop = true
     private var expectedMs: Double = 3000
     private var seq = 0
     private var clipName: String?
@@ -960,8 +960,8 @@ enum AiClient {
         field("language", "en")
         field("prompt", "Aviation radiotelephony. Flight levels, headings, frequencies, QNH, "
                          + "runway numbers, ICAO alphabet, standard phraseology.")
-        body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; "
-                         + "filename=\"clip.wav\"\r\nContent-Type: audio/wav\r\n\r\n".utf8))
+        body.append(Data(("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; "
+                         + "filename=\"clip.wav\"\r\nContent-Type: audio/wav\r\n\r\n").utf8))
         body.append(try Data(contentsOf: wav))
         body.append(Data("\r\n--\(boundary)--\r\n".utf8))
 
