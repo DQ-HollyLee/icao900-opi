@@ -212,7 +212,28 @@ python tools/preview.py             # http://127.0.0.1:8765
 - 已知边界：若系统内存压力下把渲染进程整个杀了，`onRenderProcessGone` 未处理（需重建
   WebView，暂未做）；表现为白屏且点页面内按钮无反应，只能重开 App。
 
-## 8. 开源（1.0.0 转正）
+## 8. iOS / iPadOS 壳（ios/）
+
+同一套 `app/assets` 网页前端，iOS 侧用 **WKWebView + 原生 Swift 桥**（`ios/main.swift` 单文件，
+对应 Android 的 MainActivity + TurnController + ChatClient + AiClient）：
+
+| Android | iOS |
+|---|---|
+| `addJavascriptInterface(ICAOBridge/ICAOAsr/ICAOChat)` | `WKUserContentController` 注入 JS shim → `webkit.messageHandlers.icao` |
+| `https://app.local/` 虚拟域名 | `app://local/` + `WKURLSchemeHandler`（读 Bundle/assets 与 Documents/rec） |
+| `AudioRecord` 16k PCM + 静音检测 + 归一 | `AVAudioEngine` tap + `AVAudioConverter` 降采样，算法逐行移植 |
+| 系统 `SpeechRecognizer` | `SFSpeechRecognizer`（en-US，与录音共用一条引擎） |
+| `ICAOAsr` 本地 llama 模型 | **不提供**，前端自动降级为系统识别 / 云端 AI 转写 |
+| `HttpURLConnection` | `URLSession`（对话 + multipart 转写） |
+
+- `ios/Info.plist`：麦克风 / 语音识别用途说明、`NSAllowsArbitraryLoads`（用户常填本地 LLM 的 http 地址）
+- `ios/build_ios.sh`：`swiftc -target arm64-apple-ios15.0` → 组 .app → ad-hoc 签名 → `Payload/` 打 ipa
+- `.github/workflows/ios.yml`：Windows 本机无法编译 iOS，改由 GitHub Actions 的 macOS runner 构建；
+  `workflow_dispatch` 手动触发，推 `ios-*` 标签自动发 prerelease（附带 RELEASE-ios.md 说明）
+- 分发方式：`ios/dist/ICAO900-OPI-ios-<ver>.ipa` 交给用户用 Sideloadly / AltStore / SideStore / TrollStore 自签名
+- 版本名见 `ios/Info.plist` 的 `CFBundleShortVersionString`；构建号由脚本写入时间戳
+
+## 9. 开源（1.0.0 转正）
 
 - 去掉全部"中飞 ICAO 帮手"音频署名（该音频并非其出品，与其无关），设置页底部只留"数据保存在本机"。
 - beta → 正式版：`1.0.0 (8)`，应用名 `ICAO900 OPI`，页面标题 `ICAO 900句 · OPI`，APK 名 `ICAO900-OPI.apk`。
