@@ -1,0 +1,49 @@
+name: iOS beta build
+
+# 本机是 Windows，iOS 必须在 macOS 上编译 —— 这里借 GitHub Actions 的 macOS runner 出 ipa。
+# 触发：Actions 页面手动 Run workflow，或推送 ios-* 标签（打标签会自动发 Release）。
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'ios-*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 40
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 环境信息
+        run: |
+          sw_vers
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: 构建 ipa
+        run: bash ios/build_ios.sh
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: ICAO900-OPI-ios-ipa
+          path: ios/dist/*.ipa
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: 发布到 Release（仅 tag 触发）
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd ios/dist
+          gh release create "${GITHUB_REF_NAME}" *.ipa \
+            --title "iOS/iPadOS ${GITHUB_REF_NAME}" \
+            --notes-file ../RELEASE-ios.md \
+            --prerelease
