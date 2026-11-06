@@ -1,3 +1,25 @@
+/* ---------------- 主题变量 ----------------
+   浅色为默认；夜间模式挂在 <html data-theme="dark">，用纯黑底 + 白字。
+   这里把颜色变量用 @property 注册成可动画的 <color>，并在 :root 上声明过渡：
+   切换 data-theme 时变量本身逐帧插值，所有由变量派生的颜色（页面底色、文字、
+   卡片、描边、图表线条…）就一起平滑渐变，不必给每个元素单独写 transition。
+   老版本 WebView 不支持 @property 时，变量不参与过渡，退化为瞬时切换（不报错）。 */
+@property --bg1{syntax:"<color>";inherits:true;initial-value:#f4f8fd}
+@property --bg2{syntax:"<color>";inherits:true;initial-value:#e3ecf9}
+@property --ink{syntax:"<color>";inherits:true;initial-value:#0d1b2a}
+@property --ink2{syntax:"<color>";inherits:true;initial-value:#4a5b70}
+@property --ink3{syntax:"<color>";inherits:true;initial-value:#8a99ac}
+@property --line{syntax:"<color>";inherits:true;initial-value:rgba(13,27,42,.08)}
+@property --card{syntax:"<color>";inherits:true;initial-value:#ffffff}
+@property --blue{syntax:"<color>";inherits:true;initial-value:#1b6ef3}
+@property --blue-soft{syntax:"<color>";inherits:true;initial-value:#e8f0ff}
+@property --green{syntax:"<color>";inherits:true;initial-value:#12b76a}
+@property --green-soft{syntax:"<color>";inherits:true;initial-value:#e6f8ef}
+@property --red{syntax:"<color>";inherits:true;initial-value:#ef4b5a}
+@property --red-soft{syntax:"<color>";inherits:true;initial-value:#ffecee}
+@property --navy1{syntax:"<color>";inherits:true;initial-value:#0b1f3a}
+@property --navy2{syntax:"<color>";inherits:true;initial-value:#153f66}
+
 :root{
   --bg1:#f4f8fd; --bg2:#e3ecf9;
   --ink:#0d1b2a; --ink2:#4a5b70; --ink3:#8a99ac;
@@ -12,20 +34,29 @@
   --shadow-sm:0 4px 14px rgba(16,42,78,.08);
   --radius:22px;
   --safe-b: env(safe-area-inset-bottom, 0px);
+  color-scheme: light;
+  transition:
+    --bg1 .42s ease, --bg2 .42s ease, --ink .42s ease, --ink2 .42s ease,
+    --ink3 .42s ease, --line .42s ease, --card .42s ease, --blue .42s ease,
+    --blue-soft .42s ease, --green .42s ease, --green-soft .42s ease,
+    --red .42s ease, --red-soft .42s ease, --navy1 .42s ease, --navy2 .42s ease,
+    background-color .42s ease, color .42s ease;
 }
-@media (prefers-color-scheme: dark){
-  :root{
-    --bg1:#070d17; --bg2:#0d1728;
-    --ink:#e8eef8; --ink2:#9db0c9; --ink3:#6b7f9a;
-    --line:rgba(255,255,255,.09);
-    --card:#111c2e;
-    --blue:#4a90ff; --blue-soft:#16263f;
-    --green:#2ed58a; --green-soft:#0f2a1f;
-    --red:#ff6b78; --red-soft:#2c1218;
-    --navy1:#0a1728; --navy2:#15304d;
-    --shadow:0 12px 32px rgba(0,0,0,.45);
-    --shadow-sm:0 4px 14px rgba(0,0,0,.35);
-  }
+/* 夜间模式：纯黑背景 + 白色文字。卡片用极深灰 + 细描边区分层次，
+   保证在纯黑底上仍能看清分块，不会糊成一片。 */
+html[data-theme="dark"]{
+  --bg1:#000000; --bg2:#000000;
+  --ink:#ffffff; --ink2:#c3ccd8; --ink3:#94a1b2;
+  --line:rgba(255,255,255,.12);
+  --card:#0e1116;
+  --blue:#5b9dff; --blue-soft:#132540;
+  --gold:#f6c453;
+  --green:#37d98d; --green-soft:#0d2a1e;
+  --red:#ff6f7c; --red-soft:#2b1319;
+  --navy1:#05080d; --navy2:#12283f;
+  --shadow:0 12px 32px rgba(0,0,0,.72);
+  --shadow-sm:0 4px 14px rgba(0,0,0,.58);
+  color-scheme: dark;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
@@ -114,7 +145,7 @@ button{font-family:inherit;border:0;background:none;color:inherit;padding:0;curs
 .badge-lv{font-size:10px;font-weight:800;padding:4px 8px;border-radius:8px;letter-spacing:.5px}
 .badge-lv.l3{background:var(--blue-soft);color:var(--blue)}
 .badge-lv.l4{background:rgba(240,180,41,.16);color:#c98a00}
-@media (prefers-color-scheme: dark){.badge-lv.l4{color:#f0b429}}
+html[data-theme="dark"] .badge-lv.l4{color:#f0b429}
 
 .deck-wrap{flex:1;display:flex;align-items:center;justify-content:center;perspective:1400px;margin:10px 0;min-height:0}
 .flip{position:relative;width:100%;max-width:430px;height:100%;max-height:440px;
@@ -164,7 +195,7 @@ button{font-family:inherit;border:0;background:none;color:inherit;padding:0;curs
 .en-in{width:100%;font-size:21px;line-height:1.95;font-weight:600;letter-spacing:.2px}
 .en .w{cursor:pointer;padding:1px 2px;border-radius:5px;transition:background .15s}
 .en .w.hl{background:linear-gradient(180deg,transparent 52%,rgba(240,180,41,.55) 52%);color:#7a4b00}
-@media (prefers-color-scheme: dark){.en .w.hl{color:#ffe4a8;background:linear-gradient(180deg,transparent 52%,rgba(240,180,41,.42) 52%)}}
+html[data-theme="dark"] .en .w.hl{color:#ffe4a8;background:linear-gradient(180deg,transparent 52%,rgba(240,180,41,.42) 52%)}
 .cn{font-size:13px;line-height:1.7;color:var(--ink2);border-top:1px dashed var(--line);padding-top:12px}
 .cn .tag{display:inline-block;font-size:10px;font-weight:800;color:var(--blue);background:var(--blue-soft);
   padding:2px 6px;border-radius:6px;margin-right:6px;vertical-align:1px}
@@ -215,14 +246,14 @@ button{font-family:inherit;border:0;background:none;color:inherit;padding:0;curs
 .score-txt b{color:var(--ink);font-size:12px}
 .wdiff{margin-top:10px;font-size:12px;line-height:1.9;color:var(--ink2);
   background:rgba(255,255,255,.5);border-radius:10px;padding:8px 10px;max-height:112px;overflow:auto}
-@media (prefers-color-scheme: dark){.wdiff{background:rgba(255,255,255,.04)}}
+html[data-theme="dark"] .wdiff{background:rgba(255,255,255,.06)}
 .wdiff .ok{color:var(--green)}
 .wdiff .bad{color:var(--red);text-decoration:line-through;text-decoration-thickness:1px}
 .wdiff .par{color:var(--gold)}
 .wdiff .miss{color:var(--red);opacity:.7}
 .conf-hint{margin-top:8px;font-size:11px;line-height:1.6;color:#8a5a00;background:rgba(240,180,41,.16);
   border-radius:10px;padding:6px 9px}
-@media (prefers-color-scheme: dark){.conf-hint{color:#f0c46a}}
+html[data-theme="dark"] .conf-hint{color:#f0c46a;background:rgba(240,180,41,.14)}
 
 /* 掌握按钮 */
 .mastery{display:flex;gap:10px;flex:none;margin-top:10px}
@@ -320,7 +351,7 @@ button{font-family:inherit;border:0;background:none;color:inherit;padding:0;curs
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;
   padding:8px 10px calc(8px + var(--safe-b));
   background:rgba(255,255,255,.86);backdrop-filter:blur(18px);border-top:1px solid var(--line)}
-@media (prefers-color-scheme: dark){.tabbar{background:rgba(12,22,36,.88)}}
+html[data-theme="dark"] .tabbar{background:rgba(8,9,11,.9)}
 .tabbar .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink3);
   font-size:10px;font-weight:700;padding:5px 0;border-radius:12px;transition:color .2s}
 .tabbar .tab svg{width:21px;height:21px;fill:currentColor}
@@ -376,7 +407,7 @@ button{font-family:inherit;border:0;background:none;color:inherit;padding:0;curs
 .lv-tag.l3{color:var(--blue)}
 .lv-tag.l4{color:#c98a00}
 .lv-tag.l5{color:var(--ink3)}
-@media (prefers-color-scheme: dark){.lv-tag.l4{color:#f0b429}}
+html[data-theme="dark"] .lv-tag.l4{color:#f0b429}
 
 /* 目录按钮 */
 .toc-btn{height:34px;padding:0 11px;border-radius:11px;background:var(--card);box-shadow:var(--shadow-sm);
@@ -581,3 +612,49 @@ button{font-family:inherit;border:0;background:none;color:inherit;padding:0;curs
 .voice-btns{display:inline-flex;gap:8px;align-items:center}
 .voice-btns .mini{margin-left:0;flex:0 0 auto}
 .voice-btns .mini.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+/* ==================================================================
+ *  夜间模式可视性修正
+ *  纯黑底上，浅色主题里那些"深褐/深金"的文字会看不清，统一提亮；
+ *  浅色下靠"更白"营造层次的半透明面板，在纯黑底上要反过来加深。
+ * ================================================================== */
+html[data-theme="dark"] .exam-note{color:#f5d089;background:rgba(240,180,41,.12)}
+html[data-theme="dark"] .lv-card .tag.lv4,
+html[data-theme="dark"] .ans-card .atag.l4,
+html[data-theme="dark"] .lv-tag.l4{color:#f0b429}
+html[data-theme="dark"] .bub.score .sc.low,
+html[data-theme="dark"] .score-grid .sg.low .v{color:#f0c46a}
+html[data-theme="dark"] .bub.score{background:rgba(139,92,246,.14)}
+html[data-theme="dark"] .chat-status,
+html[data-theme="dark"] .chat-rec .r,
+html[data-theme="dark"] .chat-result-head .cr-info .big,
+html[data-theme="dark"] .chat-result-head .cr-info .lvl,
+html[data-theme="dark"] .sec-title.opi-sec h2,
+html[data-theme="dark"] .chat-topic{color:#b39bff}
+html[data-theme="dark"] .chat-result-head .cr-info .lvl,
+html[data-theme="dark"] .chat-topic{background:rgba(139,92,246,.18)}
+/* 纯黑底：所有"半透明白/灰"的浅层背景改成半透明白光，保证块面可见 */
+html[data-theme="dark"] .set-field input,
+html[data-theme="dark"] .seg{background:rgba(255,255,255,.06)}
+html[data-theme="dark"] .mini.ghost,
+html[data-theme="dark"] .sheet .btns .cancel,
+html[data-theme="dark"] .toc-x{background:rgba(255,255,255,.09)}
+html[data-theme="dark"] .lv-note,
+html[data-theme="dark"] .score-grid .sg,
+html[data-theme="dark"] .ans-card .ano,
+html[data-theme="dark"] .ans-card .atag,
+html[data-theme="dark"] .dlbar{background:rgba(255,255,255,.07)}
+html[data-theme="dark"] .switch{background:rgba(255,255,255,.2)}
+html[data-theme="dark"] .switch.on{background:var(--blue)}
+html[data-theme="dark"] .sheet-mask{background:rgba(0,0,0,.62)}
+html[data-theme="dark"] .toc-mask{background:rgba(0,0,0,.58)}
+html[data-theme="dark"] .seg button.on{background:#232833;color:#fff}
+html[data-theme="dark"] .toc-item.on{background:rgba(91,157,255,.16)}
+html[data-theme="dark"] .bub.examiner{background:#16191f}
+html[data-theme="dark"] .chat-intro .ci-ico{background:rgba(139,92,246,.18)}
+/* 蓝底白字的小药丸：夜间把 --blue 调亮后白字对比不足，改用更深的蓝 */
+html[data-theme="dark"] .jchip.on,
+html[data-theme="dark"] .mini.on,
+html[data-theme="dark"] .mini.playing,
+html[data-theme="dark"] .voice-btns .mini.on{background:#2563eb;color:#fff}
+html[data-theme="dark"] .sheet .btns .ok{background:#2563eb}

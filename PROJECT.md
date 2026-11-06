@@ -20,7 +20,7 @@
 ```
 icao900-opi-beta/
 ├─ app/
-│  ├─ AndroidManifest.xml          com.icao.opi · 1.0.0 (8)
+│  ├─ AndroidManifest.xml          com.icao.opi · 1.1.0 (9)
 │  ├─ java/com/icao/opi/
 │  │  ├─ MainActivity.java         WebView 外壳 + 虚拟域名资源分发 + 权限
 │  │  ├─ TurnController.java       录音(AudioRecord→WAV，RMS 归一) + exam/opic 录音清理
@@ -167,7 +167,7 @@ ICAO 等级判断、六维优缺点、两三条最值得练的建议；注明语
 
 ## 4. 与发行版的差异
 
-| 功能 | 发行版 2.0.0 | 本应用 1.0.0 |
+| 功能 | 发行版 2.0.0 | 本应用 1.1.0 |
 |---|---|---|
 | 900 句练习 / 考试 / 记录 | ✅ | ✅ |
 | 语音识别 | 仅本地 Qwen3-ASR | 本地 ASR + 系统识别 + AI 转写（保留测试开关） |
@@ -233,7 +233,24 @@ python tools/preview.py             # http://127.0.0.1:8765
 - 分发方式：`ios/dist/ICAO900-OPI-ios-<ver>.ipa` 交给用户用 Sideloadly / AltStore / SideStore / TrollStore 自签名
 - 版本名见 `ios/Info.plist` 的 `CFBundleShortVersionString`；构建号由脚本写入时间戳
 
-## 9. 开源（1.0.0 转正）
+## 10. 夜间模式（1.1.0）
+
+设置页「外观」三段切换：**跟随系统 / 浅色 / 夜间**，存 `S.settings.theme`（`auto|light|dark`，默认 auto）。
+
+- **配色**：夜间为 `#000` 纯黑底 + `#fff` 白字；卡片 `#0e1116` 配 `rgba(255,255,255,.12)` 细描边，
+  在纯黑上仍能分出层次。变量定义在 `html[data-theme="dark"]`，浅色主题不受影响。
+- **渐变过渡**：`app.css` 顶部用 `@property` 把 15 个颜色变量注册成 `<color>`，并在 `:root` 上声明
+  `transition: --bg1 .42s …`。切主题时变量本身逐帧插值，所有由变量派生的颜色（页面底色、文字、
+  卡片、描边）一起渐变，不需要给每个元素写 transition。老 WebView 不支持 `@property` 时退化为瞬时切换。
+- **不闪白**：`index.html` 的 `<head>` 里内联一段引导脚本，样式表加载前就按 localStorage 写好
+  `data-theme`；`MainActivity` 再从 SharedPreferences 读上次主题设置窗口底色与系统栏颜色。
+- **原生同步**：新增 JS 桥 `ICAOTheme.setDark(bool)`（`MainActivity.applySystemBars`）——
+  状态栏/导航栏/WebView 底色随主题切换，并在 API 26+ 切换导航栏图标明暗
+  （白底深图标 / 黑底浅图标），避免夜间模式下方留白条。
+- **可视性修正**：见 `app.css` 末尾「夜间模式可视性修正」一节——浅色下的深褐/深金文字统一提亮，
+  半透明白面板改为半透明白光，蓝底白字小药丸改用更深的蓝保证对比度。
+
+## 11. 开源（1.0.0 转正）
 
 - 去掉全部"中飞 ICAO 帮手"音频署名（该音频并非其出品，与其无关），设置页底部只留"数据保存在本机"。
 - beta → 正式版：`1.0.0 (8)`，应用名 `ICAO900 OPI`，页面标题 `ICAO 900句 · OPI`，APK 名 `ICAO900-OPI.apk`。

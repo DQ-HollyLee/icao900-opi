@@ -30,6 +30,7 @@
     exams: [],
     settings: {
       asr: true, online: true, autoPlay: true, showCn: true, rate: 1, opiVoice: 'f',
+      theme: 'auto',
       ai: false, aiBase: 'https://api.openai.com/v1', aiModel: 'whisper-1', aiKey: '',
       localAsr: false,
       chatBase: 'https://api.openai.com/v1', chatModel: 'gpt-4o-mini', chatKey: ''
@@ -89,6 +90,42 @@
   }
   function saveProg() { save(K_PROG, S.progress); }
   function saveSet() { save(K_SET, S.settings); }
+
+  /* ------------------------------------------------ 外观主题
+     夜间模式：纯黑背景 + 白色文字。切换动画不靠逐元素 transition——
+     app.css 里用 @property 把颜色变量注册成可插值的 <color>，改 data-theme
+     时变量本身逐帧过渡，整页颜色（底色/文字/卡片/描边）一起渐变。 */
+  function themePref() {
+    var t = S.settings && S.settings.theme;
+    return (t === 'dark' || t === 'light') ? t : 'auto';
+  }
+  function themeDark() {
+    var p = themePref();
+    if (p !== 'auto') return p === 'dark';
+    try {
+      return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } catch (e) { return false; }
+  }
+  function applyTheme() {
+    var dark = themeDark();
+    try { document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light'); } catch (e) {}
+    /* 系统栏与 WebView 底色同步换色，避免夜间模式在状态栏/导航栏留白边 */
+    try { if (window.ICAOTheme && ICAOTheme.setDark) ICAOTheme.setDark(dark); } catch (e) {}
+    try {
+      var m = document.querySelector('meta[name="theme-color"]');
+      if (m) m.setAttribute('content', dark ? '#000000' : '#0b1f3a');
+    } catch (e) {}
+  }
+  /* 跟随系统时，用户在系统里切深浅色要立刻响应 */
+  function watchSystemTheme() {
+    try {
+      var mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+      if (!mq) return;
+      var h = function () { if (themePref() === 'auto') applyTheme(); };
+      if (mq.addEventListener) mq.addEventListener('change', h);
+      else if (mq.addListener) mq.addListener(h);
+    } catch (e) {}
+  }
 
   /* 学习位置：每个章节/分类各自记住上次看到第几句 */
   function posGet(key) {
@@ -1762,6 +1799,17 @@
     var s = S.settings;
     var html = '<div class="page-head"><div><h1>设置</h1><div class="sub">学习偏好与数据</div></div></div>';
 
+    /* 外观：夜间模式为纯黑底 + 白字，切换时颜色渐变（CSS 变量插值） */
+    var tp = themePref();
+    html += '<div class="set-group">' +
+      '<div class="set-row"><div class="g"><div class="t">外观</div>' +
+      '<div class="d">夜间模式为纯黑背景、白色文字，切换时整页颜色渐变过渡</div></div></div>' +
+      '<div class="set-row" style="border:0"><div class="seg" style="margin:0;flex:1">' +
+      '<button class="' + (tp === 'auto' ? 'on' : '') + '" id="btnThemeAuto">跟随系统</button>' +
+      '<button class="' + (tp === 'light' ? 'on' : '') + '" id="btnThemeLight">浅色</button>' +
+      '<button class="' + (tp === 'dark' ? 'on' : '') + '" id="btnThemeDark">夜间</button>' +
+      '</div></div></div>';
+
     html += '<div class="set-group">' +
       row('考试自动评分', '考试录音后按 ICAO 规则判分；关掉就只存录音、交卷后人工判分（练习模式不评分）', 'asr', s.asr) +
       row('系统识别优先在线', '走系统在线识别，对非母语口音更准；无网络时自动回落到本机离线识别', 'online', s.online) +
@@ -1878,6 +1926,19 @@
     var bvf = $('#btnVoiceF'), bvm = $('#btnVoiceM');
     if (bvf) bvf.onclick = function () { S.settings.opiVoice = 'f'; saveSet(); renderSettings(); toast('已切换女声考官'); };
     if (bvm) bvm.onclick = function () { S.settings.opiVoice = 'm'; saveSet(); renderSettings(); toast('已切换男声考官'); };
+
+    /* 外观切换：改设置 → 落盘 → 应用主题（颜色过渡由 CSS 变量动画完成） */
+    function pickTheme(t, tip) {
+      S.settings.theme = t;
+      saveSet();
+      applyTheme();
+      renderSettings();
+      toast(tip);
+    }
+    var btA = $('#btnThemeAuto'), btL = $('#btnThemeLight'), btD = $('#btnThemeDark');
+    if (btA) btA.onclick = function () { pickTheme('auto', '已跟随系统外观'); };
+    if (btL) btL.onclick = function () { pickTheme('light', '已切换浅色'); };
+    if (btD) btD.onclick = function () { pickTheme('dark', '已开启夜间模式'); };
     var ta = $('#btnTestAsr');
     if (ta) ta.onclick = testAsr;
     /* 本地模型：下载 / 暂停 / 删除 / 测试 */
@@ -1951,6 +2012,7 @@
           S.ofav = {}; S.opass = {}; S.chats = [];
           S.settings = {
             asr: true, online: true, autoPlay: true, showCn: true, rate: 1, opiVoice: 'f',
+            theme: 'auto',
             ai: false, aiBase: 'https://api.openai.com/v1', aiModel: 'whisper-1', aiKey: '',
             localAsr: false,
             chatBase: 'https://api.openai.com/v1', chatModel: 'gpt-4o-mini', chatKey: ''
@@ -2924,10 +2986,16 @@
     S.chats = load(K_OCHAT, []);
     S.settings = Object.assign({
       asr: true, online: true, autoPlay: true, showCn: true, rate: 1, opiVoice: 'f',
+      theme: 'auto',
       ai: false, aiBase: 'https://api.openai.com/v1', aiModel: 'whisper-1', aiKey: '',
       localAsr: false,
       chatBase: 'https://api.openai.com/v1', chatModel: 'gpt-4o-mini', chatKey: ''
     }, load(K_SET, {}));
+
+    /* 主题尽早生效（index.html 里已按 localStorage 预置过一次，这里用合并后的设置校正），
+       并挂上"跟随系统"的监听 */
+    applyTheme();
+    watchSystemTheme();
 
     fetch('data.json').then(function (r) { return r.json(); }).then(function (d) {
       S.data = d;

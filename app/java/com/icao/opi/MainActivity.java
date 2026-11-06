@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.pm.PackageManager;
 import android.content.res.AssetFileDescriptor;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -48,11 +49,13 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
-        getWindow().setStatusBarColor(0xFF0B1F3A);
-        getWindow().setNavigationBarColor(0xFFFFFFFF);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
         }
+        /* 夜间模式要连"启动瞬间的窗口底色"一起换，否则冷启动会先闪一下浅色 */
+        boolean dark0 = savedDark();
+        applySystemBars(dark0);
+        getWindow().setBackgroundDrawable(new ColorDrawable(dark0 ? 0xFF000000 : 0xFFF4F8FD));
 
         web = new WebView(this);
         WebSettings s = web.getSettings();
@@ -100,6 +103,20 @@ public class MainActivity extends Activity {
             }
         }, "ICAOMeta");
 
+        /* 主题桥：JS 切换日间/夜间时同步系统栏与 WebView 底色，
+         * 否则夜间模式下方会残留白色导航栏、过滚动时闪浅色背景 */
+        web.addJavascriptInterface(new Object() {
+            @android.webkit.JavascriptInterface
+            public void setDark(final boolean dark) {
+                runOnUiThread(() -> {
+                    applySystemBars(dark);
+                    try {
+                        getSharedPreferences("ui", MODE_PRIVATE).edit().putBoolean("dark", dark).apply();
+                    } catch (Exception ignore) {}
+                });
+            }
+        }, "ICAOTheme");
+
         setContentView(web);
         web.loadUrl(HOST + "index.html");
 
@@ -114,6 +131,35 @@ public class MainActivity extends Activity {
             return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (Exception e) {
             return "1.0.0";
+        }
+    }
+
+    /** 上次的主题（夜间=true），用于冷启动时直接铺对的底色 */
+    private boolean savedDark() {
+        try {
+            return getSharedPreferences("ui", MODE_PRIVATE).getBoolean("dark", false);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * 系统栏与 WebView 底色跟随主题。
+     * 夜间模式（dark=true）用纯黑，避免白色导航栏、过滚动浅色底与页面冲突；
+     * 浅色模式保持原样（深蓝状态栏 + 白色导航栏 + 浅灰蓝底色）。
+     */
+    private void applySystemBars(boolean dark) {
+        getWindow().setStatusBarColor(dark ? 0xFF000000 : 0xFF0B1F3A);
+        getWindow().setNavigationBarColor(dark ? 0xFF000000 : 0xFFFFFFFF);
+        if (web != null) web.setBackgroundColor(dark ? 0xFF000000 : 0xFFF4F8FD);
+        /* 导航栏图标明暗：白底要深色图标，黑底要浅色图标（API 26+） */
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            View dv = getWindow().getDecorView();
+            int flags = dv.getSystemUiVisibility();
+            flags = dark
+                    ? (flags & ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR)
+                    : (flags | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+            dv.setSystemUiVisibility(flags);
         }
     }
 

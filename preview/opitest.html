@@ -188,6 +188,34 @@ async function run() {
      'AI识别评分=' + (/AI 识别评分/.test(d.body.innerText) ? '仍存在' : '已无') +
      ' 语音转写=' + (/AI 语音转写/.test(d.body.innerText) ? '有' : '无'));
 
+  // 11) 夜间模式：三项切换、状态落盘、颜色变量过渡
+  ok('设置页有外观（跟随系统/浅色/夜间）',
+     !!d.querySelector('#btnThemeAuto') && !!d.querySelector('#btnThemeLight') && !!d.querySelector('#btnThemeDark'));
+  var dcs0 = f.contentWindow.getComputedStyle(d.documentElement);
+  ok('切换有过渡动画（--bg1 在 transition-property 里，0.42s）',
+     dcs0.transitionProperty.indexOf('--bg1') >= 0 && /0\.42s/.test(dcs0.transitionDuration),
+     dcs0.transitionProperty.slice(0, 26) + ' @' + dcs0.transitionDuration.split(',')[0]);
+  d.querySelector('#btnThemeDark').click();
+  await wait(250);
+  ok('点"夜间"后 html 标记为 dark 并已落盘',
+     d.documentElement.getAttribute('data-theme') === 'dark' &&
+     /"theme":"dark"/.test(localStorage.getItem('icao900.settings') || ''),
+     'theme=' + d.documentElement.getAttribute('data-theme'));
+  /* 无头浏览器按虚拟时间跑，CSS 过渡不会推进；这里临时关掉过渡读最终色 */
+  d.documentElement.style.transition = 'none';
+  await wait(120);
+  var dcs = f.contentWindow.getComputedStyle(d.documentElement);
+  ok('夜间为纯黑底、白字（--bg1=#000, --ink=#fff）',
+     /rgb\(0,\s*0,\s*0\)/.test(dcs.getPropertyValue('--bg1')) &&
+     /rgb\(255,\s*255,\s*255\)/.test(dcs.getPropertyValue('--ink')),
+     dcs.getPropertyValue('--bg1').trim() + ' / ' + dcs.getPropertyValue('--ink').trim());
+  d.documentElement.style.transition = '';
+  d.querySelector('#btnThemeLight').click();
+  await wait(250);
+  ok('切回浅色后标记恢复 light',
+     d.documentElement.getAttribute('data-theme') === 'light',
+     'theme=' + d.documentElement.getAttribute('data-theme'));
+
   out.textContent += '\n== PASS ' + pass + ' / FAIL ' + fail + ' ==\n';
 }
 run().catch(function (e) {

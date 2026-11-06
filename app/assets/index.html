@@ -5,6 +5,24 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0b1f3a">
 <title>ICAO 900句 · OPI</title>
+<script>
+/* 主题必须在样式表生效前定好，否则夜间模式启动时会先闪一帧白底。
+   设置存在 localStorage 的 "icao900.settings".theme：light / dark / auto（缺省）。 */
+(function () {
+  var dark = false;
+  try {
+    var s = JSON.parse(localStorage.getItem('icao900.settings') || '{}');
+    var t = (s && s.theme) || 'auto';
+    dark = t === 'dark' || (t !== 'light' && window.matchMedia &&
+           window.matchMedia('(prefers-color-scheme: dark)').matches);
+  } catch (e) {}
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  try {
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute('content', dark ? '#000000' : '#0b1f3a');
+  } catch (e) {}
+})();
+</script>
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
