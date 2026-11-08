@@ -811,7 +811,8 @@
   }
 
   /* 记下最近一次录音的电平参数：用来判断"声音小"出在采集、后处理还是回放。
-     录音代码正常的话 inPeakDb 应在 -12 dBFS 以内且 gainDb≈0；gainDb 很大说明采集电平本身就低。 */
+     inPeakDb 是归一化前的峰值；gainDb 是因为采集电平低而补的增益。
+     gainDb 接近 +38 dB 说明这台机器的麦克风给到 App 的信号本身就很小。 */
   function rememberRec(rec) {
     if (!rec || typeof rec.inPeakDb !== 'number') return;
     S.lastRec = {
@@ -1757,10 +1758,11 @@
         ' dB。若还是小，说明这台机器给到 App 的信号实在太弱。';
       tone = 'var(--red)';
     } else if (rms < -24) {
-      verdict = '后处理被峰值限制住了，响度没提上去——这是 App 侧还能改的地方。';
+      verdict = '录音仍然偏小：原始峰值 ' + f1(r.inPeakDb) + ' dBFS，语音平均 ' + rms.toFixed(0) +
+        ' dBFS。多半是没对着麦克风说，或设备采集太弱。';
       tone = 'var(--red)';
     } else {
-      verdict = '采集与后处理都正常：原始信号已接近满刻度、语音平均在 ' + rms.toFixed(0) +
+      verdict = '采集与后处理都正常：语音平均在 ' + rms.toFixed(0) +
         ' dBFS 左右。若听着仍小，问题在回放端或手机媒体音量。';
       tone = 'var(--green)';
     }

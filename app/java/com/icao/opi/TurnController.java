@@ -70,6 +70,7 @@ public class TurnController {
     private double lastInPeakDb = -120;    // 归一化前的峰值电平（dBFS）
     private double lastOutPeakDb = -120;   // 归一化后的峰值电平
     private double lastRmsDb = -120;       // 语音段平均电平（归一化后）
+    private double noiseFloor = -1;        // 底噪跟踪（0~1 的线性 RMS），用于自适应发声判定
 
     // 识别方式：系统识别（可能在线）/ AI 转写（OpenAI 兼容接口）/ 都不开（只录音）
     private boolean asrEnabled = true;
@@ -277,6 +278,7 @@ public class TurnController {
         voicedMs = 0;
         firstLoudAt = 0;
         lastLoudAt = 0;
+        noiseFloor = -1;                 // 每轮重新估底噪
         pcm = new ByteArrayOutputStream(32000 * 2 * 10);
         asrText = null;
         asrGot = false;
@@ -404,12 +406,23 @@ public class TurnController {
                         }
                         double rms = Math.sqrt(sum / n) / 32768.0;
                         long now = System.currentTimeMillis();
-                        if (rms > 0.012) {
+
+                        /* 底噪跟踪：下落快、上升慢。固定阈值 0.012（-38 dBFS）在低灵敏度
+                         * 手机/平板上永远判不出"在说话"，表现为电平条几乎不动、自动停止
+                         * 也不触发；改成按本机底噪自适应，安静环境与嘈杂环境都能用。 */
+                        if (noiseFloor < 0) noiseFloor = rms;
+                        else if (rms < noiseFloor) noiseFloor = noiseFloor * 0.7 + rms * 0.3;
+                        else noiseFloor = noiseFloor * 0.999 + rms * 0.001;
+                        double voiceThr = Math.max(0.0035, noiseFloor * 2.5);
+                        if (rms > voiceThr) {
                             lastLoudAt = now;
                             if (firstLoudAt == 0) firstLoudAt = now;
                             voicedMs += (long) (n * 1000.0 / SR_RATE);
                         }
-                        final float lv = (float) Math.min(1.0, rms * 9.0);
+                        /* 电平条按 dB 映射（-58 dBFS → 0，-14 dBFS → 1）：线性映射下
+                         * 小声说话（-45 dBFS 左右）只有 2% 高度，看起来像没在录。 */
+                        double lvDb = 20 * Math.log10(Math.max(rms, 1e-6));
+                        final float lv = (float) Math.max(0, Math.min(1, (lvDb + 58) / 44));
                         ui.post(() -> js("Host.onLevel&&Host.onLevel(" + lv + ")"));
                         final long dur = now - t0;
                         /* 手动模式只有 5 分钟安全上限，不按静音自动收；
@@ -622,8 +635,15 @@ public class TurnController {
      *
      * <p>旧版按"帧峰值的 95 分位"归一到 -1 dBFS，看似把峰值拉满了，但人耳听的是平均能量：
      * 一句话里只要有一个碰麦/咳嗽的瞬态，峰值就顶到 0 dBFS，主体语音的 RMS 仍在 -30 dBFS 左右，
-     * 回放出来照样小声。现在改成按<b>语音帧的 RMS 中位数</b>拉到约 -18 dBFS（正常语音/播客水平），
-     * 同时用"不削波的峰值上限"夹一次，保证瞬态不爆；真实电平本身太小时再把增益上限放宽到 +38 dB。</p>
+     * 回放出来照样小声。现在改成按<b>语音帧的 RMS 中位数</b>拉到约 -16 dBFS（正常语音/播客水平）。</p>
+     *
+     * <p>1.1.1 又修了两个会让"增益 = 0 dB 但录音很小声"的问题：</p>
+     * <ul>
+     *   <li>门限/峰值参考改成<b>跳过开头 150 ms + 90 分位</b>。开头那声爆音会把"最响帧"顶高，
+     *       旧版据此算门限，人声全部落到门限以下，语音帧不足 3 个就直接原样返回（增益 0）。</li>
+     *   <li>语音帧不足时不再原样返回，而是退回全帧统计，把增益推到 +38 dB 上限。</li>
+     *   <li>峰值参考限制在 8 倍 RMS 的合理峰值因数内，瞬态不再压住增益，改由 tanh 软限幅兜住。</li>
+     * </ul>
      */
     private byte[] normalize(byte[] pcm) {
         int n = pcm.length / 2;
@@ -664,37 +684,54 @@ public class TurnController {
             fe[f] = Math.sqrt(sum / Math.max(1, en - st));
         }
 
-        // 峰值参考取 98 分位：忽略极短瞬态，靠后面的软限幅兜住
-        float[] sortedPk = new float[frames];
-        for (int f = 0; f < frames; f++) sortedPk[f] = (float) fr[f];
-        java.util.Arrays.sort(sortedPk);
-        double pkRef = sortedPk[Math.min(frames - 1, (int) (frames * 0.98))];
+        /* 统计从 150 ms 之后开始：麦克风刚打开时常有一声爆音/直流台阶，这一下会把
+         * "最响帧"和门限一起抬高，让整句人声都被判成静音。旧版正是栽在这里——
+         * 语音帧数不足 3，函数原样返回，于是出现"增益 0 dB，但录音还是很小声"。 */
+        int skip = Math.min(frames / 2, (int) (SR_RATE * 0.15) / frame);
+        if (frames - skip < 3) skip = 0;
 
-        // 语音帧：门限取"最响帧低 20 dB"，把句子之间的停顿/底噪排除掉
-        double maxRms = 0;
-        for (int f = 0; f < frames; f++) if (fe[f] > maxRms) maxRms = fe[f];
-        double gate = Math.max(0.00126, maxRms * 0.10);
-        double[] voiced = new double[frames];
+        // 帧 RMS 的 90 分位当作"最响"：几个爆音/碰麦帧改不动它
+        double[] se = new double[frames - skip];
+        System.arraycopy(fe, skip, se, 0, se.length);
+        java.util.Arrays.sort(se);
+        double hiRms = se[Math.min(se.length - 1, (int) (se.length * 0.90))];
+        double gate = Math.max(0.00126, hiRms * 0.10);   // 比最响低 20 dB 以内算在说话
+
+        double[] voiced = new double[frames - skip];
         int vc = 0;
-        for (int f = 0; f < frames; f++) {
+        for (int f = skip; f < frames; f++) {
             if (fe[f] >= gate) voiced[vc++] = fe[f];
         }
-        if (vc < 3) {                                   // 几乎没说话，保持原样，别把底噪拉满
+        if (vc < 3) {
+            /* 没有稳定的语音帧（极小声，或人声被爆音压住）：退回用全部帧做参考。
+             * 宁可把增益推到上限，也不要原样返回一段听不清的录音。 */
+            vc = 0;
+            for (int f = skip; f < frames; f++) voiced[vc++] = fe[f];
+        }
+        java.util.Arrays.sort(voiced, 0, vc);
+        double refRms = voiced[Math.min(vc - 1, (int) (vc * 0.75))];   // 语音帧 RMS 的 75 分位
+        if (refRms < 1e-5) {                            // 数字静音：放大只会把底噪拉满
             lastOutPeakDb = lastInPeakDb;
             lastRmsDb = db(mean(fe));
             return pcm;
         }
-        java.util.Arrays.sort(voiced, 0, vc);
-        double refRms = voiced[(int) (vc * 0.75)];      // 语音帧 RMS 的 75 分位
         double inRms = mean(fe);
 
         double target = 0.15;                           // ≈ -16 dBFS，正常语音/播客响度
         double gain = target / Math.max(refRms, 1e-9);
-        // 峰值保护：允许瞬态轻微进入软限幅区（tanh 压住），但不能全靠削波凑响度
-        double peakCap = 0.97 / Math.max(pkRef, 1e-9) * 2.0;
+
+        /* 峰值参考同样取 90 分位，并限制在"合理峰值因数"内：超过 8 倍 RMS 的尖峰
+         * 视为碰麦/爆音等瞬态，不让它压住增益（否则一声咳嗽就把整句打回原样），
+         * 交给后面的 tanh 软限幅兜住。peakCap 允许峰值略过 1.2，也是留给软限幅。 */
+        double[] sp = new double[frames - skip];
+        System.arraycopy(fr, skip, sp, 0, sp.length);
+        java.util.Arrays.sort(sp);
+        double pkRef = sp[Math.min(sp.length - 1, (int) (sp.length * 0.90))];
+        if (pkRef > refRms * 8) pkRef = refRms * 8;
+        double peakCap = 1.2 / Math.max(pkRef, 1e-9);
         if (gain > peakCap) gain = peakCap;
         if (gain < 1.0) gain = 1.0;                     // 已经够响就不衰减
-        if (gain > 79.0) gain = 79.0;                   // 上限约 +38 dB（原来 +28 dB 常被卡住）
+        if (gain > 79.0) gain = 79.0;                   // 上限约 +38 dB
         lastGainDb = 20 * Math.log10(gain);
 
         byte[] out = new byte[n * 2];
